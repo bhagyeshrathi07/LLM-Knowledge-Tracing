@@ -1,0 +1,13 @@
+Reviewed snapshot SHA-256 (2026-09-30)
+Only listed files read for this manifest; no environment files read.
+
+96b507121e3dd8a410051c7892e3f9bd8ed29b8ff9d4144f4cd4403be37f1aac  docs/workbook/Workbook1.docx
+265854e73c5a547eb092aacf95c0986984f4dcf0dcc49f8547844b32af40e417  docs/workbook/Workbook1.pdf
+b6017e356f720052fe1dd5e5874249b62c0da9363510aabdb5bb724ea0dfbd6d  src/llm_kt/evaluate.py
+3e090312e56e0902249b604a6f5cc7944c684c078de598ba92b7732ac6e2d005  src/llm_kt/baselines.py
+06186101db08250ad3e1fc0e3eb397f90540ba2fb0fbe6a110c24cc6bc748a53  scripts/run_baselines.py
+74081b16de1b30ab972b886fad7d9adc836dc14012ca1ed0eb730659642631c1  scripts/plot_skill_curves.py
+9bb2a05c0f43911050eb82925e4b65b491f4f7f73506b965e49bb0e1ac13a244  docs/figures/architecture.png
+eb49a6fc5b92bbde83c221fe605d841f2d90a6d8b57fa2860e712f3dcb42394b  docs/research-brief.md
+a44f9e9e39eed3241f9bbd6fc8e2a6bda20295d5dcabeb42b8ad355bfdbe98f1  docs/project-notes.md
+e91be6ebdbc1bb46c9c05b56fcfefad949d9b5dbed17a4c141ca879569cd93db  docs/lit-review-2026-09-30.md

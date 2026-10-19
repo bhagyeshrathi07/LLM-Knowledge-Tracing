@@ -1,0 +1,129 @@
+FILE 12584584 rows 27842 items 452 checkpoints 27537531 bytes
+SCHEMA model                 str
+checkpoint_idx      int32
+checkpoint_label      str
+step                Int64
+tokens_seen_b       Int64
+benchmark             str
+skill                 str
+item_id               str
+correct              int8
+NULLS model                     0
+checkpoint_idx            0
+checkpoint_label          0
+step                3313198
+tokens_seen_b       7656550
+benchmark                 0
+skill                     0
+item_id                   0
+correct                   0
+CORRECT [0 1]
+MODELS            checkpoints  items     rows
+model                                 
+amber-7b            73  27842  2032466
+k2-65b              46  27842  1280732
+olmo1-7b            83  27842  2310886
+olmo2-7b            94  27842  2617148
+pythia-3b           78  27842  2171676
+pythia-7b           78  27842  2171676
+BENCHMARKS                items  skills
+benchmark                   
+arc_challenge   1172       1
+gsm8k           1319       1
+hellaswag      10042       1
+mmlu           14042      57
+winogrande      1267       1
+METADATA                        first_label                     last_label  missing_steps  missing_tokens
+model                                                                                           
+amber-7b                  ckpt_000                       ckpt_358             73              73
+k2-65b                    ckpt_093                       ckpt_360             46              46
+olmo1-7b            step0-tokens0B         step650650-tokens2729B              0               0
+olmo2-7b   stage1-step150-tokens1B  stage1-step928646-tokens3896B              0               0
+pythia-3b                    step0                     step143000              0              78
+pythia-7b                    step0                     step143000              0              78
+ORDER
+amber-7b step monotone True token monotone True idx 0 72
+k2-65b step monotone True token monotone True idx 0 45
+olmo1-7b step monotone True token monotone True idx 0 82
+olmo2-7b step monotone True token monotone True idx 0 93
+pythia-3b step monotone True token monotone True idx 0 77
+pythia-7b step monotone True token monotone True idx 0 77
+FIRST_LAST_ACCS               first      last
+model                        
+amber-7b   0.238237  0.460958
+k2-65b     0.608002  0.735723
+olmo1-7b   0.262481  0.627864
+olmo2-7b   0.241506  0.657999
+pythia-3b  0.263954  0.399289
+pythia-7b  0.263702  0.415918
+CURVES EXACT REBUILD PASS 27572
+57_SUBJECT_NEVER_ABOVE_25 0
+57_SUBJECT_NEVER_CI_ABOVE_25 0
+SIX_CHANCE_CANDIDATES Empty DataFrame
+Columns: [first, last, peak, peak_ci_lo, drop]
+Index: []
+5_FORGET_CANDIDATES                         first      last      peak  peak_ci_lo      drop
+skill                                                                  
+machine_learning     0.312500  0.383929  0.517857    0.426268  0.133929
+abstract_algebra     0.220000  0.270000  0.400000    0.309400  0.130000
+global_facts         0.180000  0.320000  0.440000    0.346719  0.120000
+public_relations     0.218182  0.581818  0.700000    0.608800  0.118182
+college_mathematics  0.210000  0.340000  0.440000    0.346719  0.100000
+econometrics         0.236842  0.298246  0.394737    0.309848  0.096491
+business_ethics      0.300000  0.600000  0.690000    0.593738  0.090000
+medical_genetics     0.300000  0.690000  0.770000    0.678454  0.080000
+OLMO2_EXAMPLE                             first      last      peak  peak_ci_lo      drop
+skill                                                                      
+world_religions          0.321637  0.824561  0.847953    0.786538  0.023392
+professional_law         0.245763  0.425033  0.448501    0.423772  0.023468
+high_school_mathematics  0.211111  0.307407  0.351852    0.297330  0.044444
+BIOLOGY               first      last      peak  peak_ci_lo
+model                                              
+amber-7b   0.183871  0.267742  0.316129    0.266888
+k2-65b     0.541935  0.803226  0.822581    0.776182
+olmo1-7b   0.183871  0.654839  0.654839    0.600310
+olmo2-7b   0.177419  0.725806  0.754839    0.704023
+pythia-3b  0.316129  0.248387  0.316129    0.266888
+pythia-7b  0.316129  0.245161  0.319355    0.269937
+RESULT FILE baseline_results.parquet 134200 columns ['predictor', 'model', 'origin_idx', 'target_idx', 'skill', 'n', 'log_loss', 'brier', 'accuracy', 'auc', 'horizon'] horizons [1]
+SUMMARY            predictor        n  log_loss    brier  accuracy      auc
+           copy_last 12250480  0.432347 0.129054  0.851182 0.730598
+copy_last_calibrated 12250480  0.377524 0.113411  0.852353 0.728548
+         global_mean 12250480  0.661407 0.234433  0.613831 0.500000
+           item_mean 12250480  0.360227 0.113805  0.838517 0.800198
+          skill_mean 12250480  0.582006 0.198767  0.703705 0.500000
+SUMMARIZE MMLU ONLY            predictor       n  log_loss    brier  accuracy      auc
+           copy_last 6178480  0.606990 0.192641  0.771699 0.723936
+copy_last_calibrated 6178480  0.518596 0.165009  0.773802 0.721758
+         global_mean 6178480  0.648096 0.227801  0.656273 0.500000
+           item_mean 6178480  0.483458 0.157982  0.770776 0.792491
+          skill_mean 6178480  0.599341 0.205002  0.698825 0.500000
+SLICE_COVERAGE            targets  first_target  last_target  skills
+model                                                
+amber-7b        71             2           72      61
+k2-65b          44             2           45      61
+olmo1-7b        81             2           82      61
+olmo2-7b        92             2           93      61
+pythia-3b       76             2           77      61
+pythia-7b       76             2           77      61
+RESULT FILE baseline_results_h5.parquet 126880 columns ['predictor', 'model', 'origin_idx', 'target_idx', 'skill', 'n', 'log_loss', 'brier', 'accuracy', 'auc', 'horizon'] horizons [5]
+SUMMARY            predictor        n  log_loss    brier  accuracy      auc
+           copy_last 11582272  0.473154 0.143912  0.832610 0.704720
+copy_last_calibrated 11582272  0.403830 0.123300  0.836558 0.704625
+         global_mean 11582272  0.664371 0.235824  0.609665 0.500000
+           item_mean 11582272  0.388302 0.123105  0.826048 0.779227
+          skill_mean 11582272  0.584732 0.199922  0.701414 0.500000
+SUMMARIZE MMLU ONLY            predictor       n  log_loss    brier  accuracy      auc
+           copy_last 5841472  0.658127 0.211260  0.748425 0.697562
+copy_last_calibrated 5841472  0.539024 0.174534  0.756044 0.697470
+         global_mean 5841472  0.647156 0.227352  0.656209 0.500000
+           item_mean 5841472  0.507538 0.166155  0.759921 0.771217
+          skill_mean 5841472  0.602520 0.206431  0.695988 0.500000
+SLICE_COVERAGE            targets  first_target  last_target  skills
+model                                                
+amber-7b        67             6           72      61
+k2-65b          40             6           45      61
+olmo1-7b        77             6           82      61
+olmo2-7b        88             6           93      61
+pythia-3b       72             6           77      61
+pythia-7b       72             6           77      61

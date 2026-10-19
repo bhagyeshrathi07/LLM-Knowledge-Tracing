@@ -1,0 +1,13 @@
+RAW REINGEST EXACT PASS amber-7b seconds 11.1
+SAMPLED BASELINE EXACT PASS amber-7b cumulative_slices 1830
+RAW REINGEST EXACT PASS k2-65b seconds 20.6
+SAMPLED BASELINE EXACT PASS k2-65b cumulative_slices 3660
+RAW REINGEST EXACT PASS olmo1-7b seconds 35.7
+SAMPLED BASELINE EXACT PASS olmo1-7b cumulative_slices 5490
+RAW REINGEST EXACT PASS olmo2-7b seconds 53.0
+SAMPLED BASELINE EXACT PASS olmo2-7b cumulative_slices 7320
+RAW REINGEST EXACT PASS pythia-3b seconds 68.6
+SAMPLED BASELINE EXACT PASS pythia-3b cumulative_slices 9150
+RAW REINGEST EXACT PASS pythia-7b seconds 82.7
+SAMPLED BASELINE EXACT PASS pythia-7b cumulative_slices 10980
+PASS 10980 slices elapsed_seconds 86.0
