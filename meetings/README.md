@@ -17,7 +17,8 @@ Every action item names one owner and one due date. Action items carry forward u
 | 2026-09-15 | Team | Aniket Sarrin | Paper summaries presented; time step = checkpoint identified as Decision 1; two-phase plan |
 | 2026-09-23 | Team | Ronak Patel | Literature search reviewed: core claim holds, abstract claim to soften; data verification plan |
 | 2026-09-29 | Team | Bhagyesh Rathi | Data verified; Decisions 1–5 adopted; track owners set; repo, ingest, curves, baselines built |
+| 2026-10-19 | Advisor | Ronak Patel | Results presented; advisor interested in baseline ladder (subject vs. item); held-out test-set check suggested; CoT/hallucination KT noted as later direction; BKT next |
 
 ## Next
 
-- Book the next advisor meeting and add its note the same day.
+- Book the next advisor meeting (target early November) and add its note the same day.
