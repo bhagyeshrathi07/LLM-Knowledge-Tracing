@@ -225,3 +225,7 @@ data/processed/*
 
 # macOS
 .DS_Store
+
+# Internal team briefing, not published
+docs/team-briefing.md
+docs/advisor-briefing-*.html

@@ -9,7 +9,13 @@ from llm_kt.baselines import (
     ItemMean,
     SkillMean,
 )
-from llm_kt.evaluate import evaluate, evaluate_model, rolling_origins, summarize
+from llm_kt.evaluate import (
+    evaluate,
+    evaluate_model,
+    paired_difference,
+    rolling_origins,
+    summarize,
+)
 
 
 def make_responses(model: str, matrix: dict[str, list[int]], skill_of: dict[str, str]) -> pd.DataFrame:
@@ -188,3 +194,126 @@ class TestEvaluateAndSummarize:
         assert s.loc[0, "accuracy"] == pytest.approx(0.75)
         assert s.loc[0, "auc"] == pytest.approx(0.8)
         assert s.loc[0, "n"] == 4
+
+
+def synthetic_results(n_skills: int, seed: int = 0, predictor: str = "p") -> pd.DataFrame:
+    """Per-(target, skill) slices with skill-level heterogeneity in the scores."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for s in range(n_skills):
+        skill_level = rng.uniform(0.2, 0.8)
+        for t in range(5):
+            rows.append(
+                {
+                    "predictor": predictor,
+                    "model": "m",
+                    "origin_idx": t,
+                    "target_idx": t + 1,
+                    "skill": f"s{s}",
+                    "n": int(rng.integers(5, 15)),
+                    "log_loss": skill_level + rng.normal(0, 0.05),
+                    "brier": skill_level / 3 + rng.normal(0, 0.02),
+                    "accuracy": 1 - skill_level + rng.normal(0, 0.05),
+                    "auc": 0.5 + skill_level / 2 + rng.normal(0, 0.02),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+SE_COLUMNS = ["log_loss_se", "brier_se", "accuracy_se", "auc_se"]
+
+
+class TestSummarizeBootstrap:
+    def test_no_boot_means_no_se_columns_and_same_output(self):
+        results = synthetic_results(4)
+        plain = summarize(results)
+        explicit = summarize(results, n_boot=0)
+        pd.testing.assert_frame_equal(plain, explicit)
+        assert not set(SE_COLUMNS) & set(plain.columns)
+
+    def test_point_estimates_unchanged_by_bootstrap(self):
+        results = synthetic_results(4)
+        plain = summarize(results)
+        boot = summarize(results, n_boot=200)
+        pd.testing.assert_frame_equal(plain, boot[plain.columns])
+
+    def test_se_positive_and_shrinks_with_more_clusters(self):
+        few = summarize(synthetic_results(4), n_boot=200)
+        many = summarize(synthetic_results(40), n_boot=200)
+        for col in SE_COLUMNS:
+            assert few.loc[0, col] > 0
+            assert many.loc[0, col] > 0
+            assert many.loc[0, col] < few.loc[0, col]
+
+    def test_reproducible_with_seed(self):
+        results = synthetic_results(10)
+        a = summarize(results, n_boot=100, seed=3)
+        b = summarize(results, n_boot=100, seed=3)
+        pd.testing.assert_frame_equal(a, b)
+
+    def test_single_cluster_gives_zero_se(self):
+        results = synthetic_results(1)
+        s = summarize(results, n_boot=50)
+        assert s.loc[0, "log_loss_se"] == pytest.approx(0.0)
+
+    def test_cluster_none_resamples_rows(self):
+        s = summarize(synthetic_results(1), n_boot=200, cluster=None)
+        assert s.loc[0, "log_loss_se"] > 0
+
+    def test_missing_cluster_column_rejected(self):
+        results = synthetic_results(4).drop(columns="skill")
+        with pytest.raises(ValueError):
+            summarize(results, n_boot=10)
+
+
+class TestPairedDifference:
+    def test_identical_predictors_give_zero(self):
+        a = synthetic_results(10, predictor="a")
+        results = pd.concat([a, a.assign(predictor="b")], ignore_index=True)
+        out = paired_difference(results, "a", "b", n_boot=200)
+        assert len(out) == 1
+        row = out.iloc[0]
+        assert row["model"] == "m"
+        assert row["diff"] == pytest.approx(0.0)
+        assert row["se"] == pytest.approx(0.0)
+        assert row["ci_low"] <= 0 <= row["ci_high"]
+
+    def test_constant_shift_is_recovered(self):
+        a = synthetic_results(10, predictor="a")
+        b = a.assign(predictor="b", log_loss=a["log_loss"] - 0.1)
+        out = paired_difference(pd.concat([a, b], ignore_index=True), "a", "b", n_boot=200)
+        assert out.loc[0, "diff"] == pytest.approx(0.1)
+        assert out.loc[0, "ci_low"] == pytest.approx(0.1)
+        assert out.loc[0, "ci_high"] == pytest.approx(0.1)
+
+    def test_only_shared_slices_count(self):
+        a = synthetic_results(10, predictor="a")
+        b = a.assign(predictor="b")
+        # b is missing skill s0; a's s0 rows get a huge loss that must not leak into the diff
+        a.loc[a.skill == "s0", "log_loss"] = 100.0
+        b = b[b.skill != "s0"]
+        out = paired_difference(pd.concat([a, b], ignore_index=True), "a", "b", n_boot=50)
+        assert out.loc[0, "diff"] == pytest.approx(0.0)
+        assert out.loc[0, "n_clusters"] == 9
+
+    def test_weighted_by_n(self):
+        rows = []
+        for pred, ll in [("a", [1.0, 0.0]), ("b", [0.0, 0.0])]:
+            for skill, n, v in zip(["x", "y"], [1, 3], ll):
+                rows.append(
+                    {
+                        "predictor": pred, "model": "m", "origin_idx": 0, "target_idx": 1,
+                        "skill": skill, "n": n, "log_loss": v, "brier": 0.0,
+                        "accuracy": 0.0, "auc": np.nan,
+                    }
+                )
+        out = paired_difference(pd.DataFrame(rows), "a", "b", n_boot=20)
+        assert out.loc[0, "diff"] == pytest.approx(0.25)
+
+    def test_groups_by_model(self):
+        a = pd.concat(
+            [synthetic_results(5, predictor="a"), synthetic_results(5, predictor="a").assign(model="z")],
+            ignore_index=True,
+        )
+        out = paired_difference(pd.concat([a, a.assign(predictor="b")]), "a", "b", n_boot=20)
+        assert list(out["model"]) == ["m", "z"]
