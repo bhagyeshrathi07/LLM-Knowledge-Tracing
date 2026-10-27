@@ -22,3 +22,4 @@ Every action item names one owner and one due date. Action items carry forward u
 ## Next
 
 - Book the next advisor meeting (target early November) and add its note the same day.
+- Record Decision 6 (MMLU only for learner models; other benchmarks kept for the ladder, transfer tests and controls; adopted 2026-10-27, `docs/project-notes.md` §6) in the next meeting note under "Accomplished Since Last Meeting".
