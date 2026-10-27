@@ -2,6 +2,8 @@
 
 Written 2026-10-19 for Bhagyesh and Aniket, right after the advisor meeting. This replaces the 2026-10-01 briefing. It covers everything in the repository as of today (Sprint 3 code and the Workbook 1 package were pushed to `main` this morning), what the experiments showed, what the advisor said, and what each of us does next. Reference documents are listed at the end. Read this first; go to those for detail.
 
+**Updated 2026-10-27:** the repository map (§4), the action-item status (§7) and the head commit (§9) now reflect the current `main`; the OLMo-2 global-mean log-loss in §5.1 was corrected to 0.69. The results in §5 are otherwise as presented on Oct 19.
+
 ---
 
 ## 1. The project in plain language
@@ -23,11 +25,11 @@ Two decisions shape everything (adopted 2026-09-29, `docs/project-notes.md` §6)
 
 Two literature passes (Sep 22 and Sep 30), 49 references, about 45 read in full, two independent audits of the workbook.
 
-| Group of papers | What they do | What they lack |
-|---|---|---|
+| Group of papers                                                                               | What they do                                                                              | What they lack                                                                                 |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | Test-scoring statistics applied to AI models (Fluid Benchmarking, Item Response Scaling Laws) | Score each checkpoint like a student taking one exam; one group published the data we use | Each checkpoint scored alone; nothing carries forward, so no notion of a skill learned or lost |
-| Studies of models during training (MathCAMPS, Implicit Curriculum, Harmon et al.) | Show skills appear in a stable order; count questions that flip right-to-wrong | Charts and counts only; no model of the student, no prediction test |
-| Student-tracking methods (education, political science) | Built for a few learners watched over many periods, exactly our shape | Never applied to an AI model's checkpoints |
+| Studies of models during training (MathCAMPS, Implicit Curriculum, Harmon et al.)             | Show skills appear in a stable order; count questions that flip right-to-wrong            | Charts and counts only; no model of the student, no prediction test                            |
+| Student-tracking methods (education, political science)                                       | Built for a few learners watched over many periods, exactly our shape                     | Never applied to an AI model's checkpoints                                                     |
 
 Our claim, worded carefully: *in the sources reviewed through September 30, 2026, we did not identify a method that jointly models a per-skill latent state across an LLM's pretraining checkpoints, treats each checkpoint's responses as a batch, and evaluates item-level predictions on later held-out checkpoints with calibrated uncertainty.* Not "nobody has done this"; a search cannot prove that.
 
@@ -43,26 +45,39 @@ Our claim, worded carefully: *in the sources reviewed through September 30, 2026
 
 ## 4. What is in the repository
 
-Everything below is on `main`. 328 tests pass (`pytest`), `ruff` clean.
+Everything below is on `main` as of 2026-10-27. 375 tests pass (`pytest`), `ruff` clean. (At the Oct 19 briefing: 328 tests.)
 
 ### Library, `src/llm_kt/`
 
-| Module | What it does |
-|---|---|
-| `ingest.py` | Six Fluid CSVs to one Parquet table: `model, checkpoint_idx, checkpoint_label, step, tokens_seen_b, benchmark, skill, item_id, correct` |
-| `curves.py` | Per-skill accuracy per checkpoint with Wilson intervals |
-| `metrics.py` | Log-loss, Brier, accuracy, AUC |
-| `evaluate.py` | Walk-forward harness: see everything up to checkpoint t, predict every item at t+h. Chronological train/validation/test blocks per model (OLMo-2: checkpoints 0–55 / 56–74 / 75–93). `summarize` gives subject-clustered bootstrap standard errors; `paired_difference` gives a difference with a 95% interval between any two predictors |
-| `baselines.py` | Five no-learning predictors: global mean, per-skill mean, item-history mean (shrunk toward global), copy-last, copy-last-calibrated |
-| `static_irt.py` | Static IRT persistence: at each checkpoint re-estimate one ability per skill from a window of past responses, using 2PL item parameters, and carry it forward |
-| `tskirt.py` | T-SKIRT (temporal IRT): ability drifts over training, so older answers count less (discrimination discounted by the time gap); probit link; optional posterior variance in the forecast |
-| `recalibrate.py` | Per-model recalibration: re-learn each item's difficulty offset (δ) and discrimination multiplier (γ) from the model's own past checkpoints instead of borrowing Fluid's population values; Newton MAP with shrinkage (`tau`, `tau_a`) |
-| `calibrate.py` | Walk-forward temperature / Platt calibration wrapper: refit the confidence mapping on past checkpoints only |
-| `forgetting.py` | Peak-to-final McNemar test per (model, subject) with Holm and selection adjustment; `min_peak_idx` guards against early noisy peaks |
+| Module           | What it does                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ingest.py`      | Six Fluid CSVs to one long Parquet table (columns in the notes below)                                         |
+| `curves.py`      | Per-skill accuracy per checkpoint with Wilson intervals                                                       |
+| `metrics.py`     | Log-loss, Brier, accuracy, AUC                                                                                |
+| `evaluate.py`    | Walk-forward harness; chronological train/validation/test blocks; clustered bootstrap SEs; paired differences |
+| `baselines.py`   | Five no-learning predictors: global mean, skill mean, item mean, copy-last, copy-last-calibrated              |
+| `static_irt.py`  | Static IRT persistence: one ability per skill re-estimated from past checkpoints and carried forward          |
+| `tskirt.py`      | T-SKIRT: temporal IRT with a drifting ability, probit link, optional forecast variance                        |
+| `recalibrate.py` | Per-model recalibration of item difficulty (δ) and discrimination (γ) from the model's own history            |
+| `calibrate.py`   | Walk-forward temperature / Platt calibration wrapper                                                          |
+| `forgetting.py`  | Peak-to-final McNemar test with Holm and selection adjustment; chance and letter checks (added Oct 27)        |
+| `ladder.py`      | Baseline ladder tables and skill-vs-item variance decomposition (added Oct 27)                                |
+| `drift_irt.py`   | DriftIRT: per-skill ability plus drifting per-item residuals (added Oct 27)                                   |
+
+Notes on the heavier modules:
+
+- `ingest.py` columns: `model, checkpoint_idx, checkpoint_label, step, tokens_seen_b, benchmark, skill, item_id, correct`.
+- `evaluate.py` sees everything up to checkpoint t and predicts every item at t+h. Blocks per model (OLMo-2: checkpoints 0–55 / 56–74 / 75–93). `summarize` gives subject-clustered bootstrap standard errors; `paired_difference` gives a difference with a 95% interval between any two predictors.
+- `static_irt.py` uses Fluid's 2PL item parameters and a window of past responses.
+- `tskirt.py` lets older answers count less (discrimination discounted by the time gap); the forecast can include posterior variance.
+- `recalibrate.py` learns δ and γ from the model's own past checkpoints instead of borrowing Fluid's population values; Newton MAP with shrinkage (`tau`, `tau_a`).
+- `forgetting.py`: `min_peak_idx` guards against early noisy peaks. `chance_check` compares accuracy at peak and final with chance (Wilson intervals) and with the rest of MMLU at the same checkpoints. `letter_check` recovers the answer-letter preference from accuracy split by gold letter, G-tests for a change in that profile, and reports the residual drop after removing the letter effect.
+- `ladder.py`: pooled ladder with skill and item gaps, per-checkpoint ladder, between-skill vs. within-skill variance, item-history R².
+- `drift_irt.py`: state-space probit IRT; each item's residual drifts on its own, shrunk toward Fluid's difficulty; diagonal Gaussian filter; forecast variance decoupled from fitting drift.
 
 ### Scripts, `scripts/`
 
-`ingest_fluid.py`, `plot_skill_curves.py`, `run_baselines.py`, `run_models.py` (`--predictors item_mean static_irt tskirt`, `--nu`, `--recalibrate`, `--tau`, `--tau-a`, `--horizon`), `run_calibrated.py`, `run_forgetting.py`, `analyze_sweep.py`, `analyze_horizons.py`. Each writes to `data/processed/` (gitignored); the README has the commands.
+`ingest_fluid.py`, `plot_skill_curves.py`, `run_baselines.py`, `run_models.py` (`--predictors item_mean static_irt tskirt drift_irt`, `--nu`, `--recalibrate`, `--tau`, `--tau-a`, `--q-theta`, `--q-delta`, `--horizon`), `run_calibrated.py`, `run_forgetting.py` (`--chance-check` adds the chance-adjusted table), `analyze_sweep.py`, `analyze_horizons.py`, `analyze_ladder.py` (ladder tables and the two ladder figures in `docs/figures/`), `analyze_drift_irt.py` (selects a DriftIRT setting on validation; paired differences vs. item mean at h = 1, 5, 20). Each writes to `data/processed/` (gitignored). The README has the setup, ingest and baseline commands; each script's docstring has its own.
 
 ### Documents
 
@@ -78,7 +93,17 @@ Metrics: **log-loss** (quality of the predicted probabilities, lower is better) 
 
 The strongest predictor with no learning in it: for each question, average how the model did on it at all previous checkpoints (item mean). One checkpoint ahead: log-loss 0.457, AUC 0.862 pooled; 0.375 ± 0.015 / 0.916 ± 0.006 on the test block.
 
-**The result the advisor cared most about.** Same slice, same horizon, log-loss: guessing from the overall score so far gives 0.69; from the model's score on that subject, 0.63; from that specific question's own history, 0.46. Knowing the subject helps little; knowing the question helps a lot. Any learner model must carry per-question difficulty or it loses. (Across all six models and all benchmarks, the same ladder is 0.661 / 0.582 / 0.360 at h = 1.)
+**The result the advisor cared most about.** The baseline ladder, pooled log-loss one checkpoint ahead:
+
+| What the predictor knows                       | OLMo-2, MMLU | All six models, all benchmarks |
+| ---------------------------------------------- | ------------ | ------------------------------ |
+| The model's overall score so far (global mean) | 0.69         | 0.661                          |
+| Its score on that subject (skill mean)         | 0.63         | 0.582                          |
+| That question's own history (item mean)        | 0.46         | 0.360                          |
+
+Knowing the subject helps little; knowing the question helps a lot. Any learner model must carry per-question difficulty or it loses.
+
+Reproduced 2026-10-27 from `run_baselines.py` (all benchmarks) and `run_models.py --benchmarks mmlu`. The item mean shrinks toward the global mean of the benchmarks included in the run, so the OLMo-2 MMLU item-mean value is 0.457 in the MMLU-only run and 0.454 in the all-benchmark run; the other values agree to the digits shown.
 
 ### 5.2 Borrowed item difficulties lose badly
 
@@ -86,10 +111,10 @@ T-SKIRT using Fluid's published item parameters, best drift setting: pooled log-
 
 ### 5.3 Recalibration closes most of the gap
 
-| One checkpoint ahead | Pooled log-loss | Pooled AUC | Test log-loss | Test AUC |
-|---|---|---|---|---|
-| Item mean (the bar) | 0.457 | 0.862 | 0.375 ± 0.015 | 0.916 ± 0.006 |
-| T-SKIRT, recalibrated (settings chosen on validation only) | 0.446 | 0.858 | 0.375 ± 0.024 | 0.912 ± 0.006 |
+| One checkpoint ahead                                       | Pooled log-loss | Pooled AUC | Test log-loss | Test AUC      |
+| ---------------------------------------------------------- | --------------- | ---------- | ------------- | ------------- |
+| Item mean (the bar)                                        | 0.457           | 0.862      | 0.375 ± 0.015 | 0.916 ± 0.006 |
+| T-SKIRT, recalibrated (settings chosen on validation only) | 0.446           | 0.858      | 0.375 ± 0.024 | 0.912 ± 0.006 |
 
 Paired difference on the test block (T-SKIRT minus item mean): log-loss −0.0003, 95% interval [−0.020, +0.025], a tie; AUC −0.003 [−0.006, −0.001], item mean slightly but reliably better at ranking.
 
@@ -97,12 +122,12 @@ Paired difference on the test block (T-SKIRT minus item mean): log-loss −0.000
 
 All values log-loss on the test block (pooled in brackets).
 
-| Horizon | Item mean | T-SKIRT | Paired difference |
-|---|---|---|---|
-| 1 | 0.375 [0.457] | 0.375 [0.446] | −0.000 [−0.020, +0.025], tie |
-| 5 | 0.382 [0.484] | 0.382 [0.463] | −0.001 [−0.014, +0.012], tie |
-| 10 | 0.392 [0.506] | 0.399 [0.483] | +0.007 [−0.003, +0.015], tie |
-| 20 | 0.414 [0.545] | 0.437 [0.518] | +0.024 [+0.016, +0.031], item mean wins |
+| Horizon | Item mean     | T-SKIRT       | Paired difference                       |
+| ------- | ------------- | ------------- | --------------------------------------- |
+| 1       | 0.375 [0.457] | 0.375 [0.446] | −0.000 [−0.020, +0.025], tie            |
+| 5       | 0.382 [0.484] | 0.382 [0.463] | −0.001 [−0.014, +0.012], tie            |
+| 10      | 0.392 [0.506] | 0.399 [0.483] | +0.007 [−0.003, +0.015], tie            |
+| 20      | 0.414 [0.545] | 0.437 [0.518] | +0.024 [+0.016, +0.031], item mean wins |
 
 Pooled over the whole run, T-SKIRT leads by 0.01–0.03 log-loss, growing with horizon. Reading: the temporal model wins during the early, fast-changing phase of training and ties or loses on the late test checkpoints, where learning has plateaued and its forecast uncertainty only spreads predictions out.
 
@@ -116,7 +141,7 @@ Pooled over the whole run, T-SKIRT leads by 0.01–0.03 log-loss, growing with h
 McNemar peak-to-final test on every (model, subject): did more questions flip right-to-wrong than wrong-to-right between the subject's best checkpoint and its last? P-values adjusted for screening 57 subjects and for picking the peak after looking.
 
 - The seven OLMo-2 subjects that looked like forgetting by eye do not survive: raw p 0.002–0.049 become 1.0 after adjustment.
-- Five (model, subject) pairs across all six models survive at adjusted p < 0.05. One looks real: OLMo-1, moral_scenarios, 895 questions, accuracy 0.37 to 0.24 between checkpoint 79 and the final checkpoint 82, adjusted p < 0.0001. The three Pythia hits (0.40 to 0.18–0.28 on security_studies and professional_medicine) look like answer-position bias on a near-chance model; a chance-adjusted check is the next step.
+- Five (model, subject) pairs across all six models survive at adjusted p < 0.05. One looks real: OLMo-1, moral_scenarios, 895 questions, accuracy 0.37 to 0.24 between checkpoint 79 and the final checkpoint 82, adjusted p < 0.0001. The three Pythia hits (0.40 to 0.18–0.28 on security_studies and professional_medicine) look like answer-position bias on a near-chance model; a chance-adjusted check is the next step (implemented Oct 27 as `run_forgetting.py --chance-check`; its results are not yet recorded here).
 
 ### 5.7 Honest verdict
 
@@ -153,6 +178,18 @@ Owners follow the track split from Sep 29 (Ronak: data, harness, visualization; 
 - Design and run the advisor's held-out test: fit per-skill trajectories on one item set, test whether they predict the same checkpoints' performance on held-out items and on other benchmarks. Due Nov 2.
 - Phase 2 GPU pilot and cost estimate stay on the calendar (Nov 25 / Dec 12).
 
+**Status as of 2026-10-27** (what is on `main`; "not recorded" means the code exists but no numbers are in the repo yet):
+
+| Action                                                | Owner    | Due            | Status                                                                                                                                                            |
+| ----------------------------------------------------- | -------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Expand the baseline-ladder analysis                   | Ronak    | Oct 26         | Code and figures on `main` (`ladder.py`, `analyze_ladder.py`, `docs/figures/ladder_over_training.png`, `variance_decomposition.png`); findings not yet written up |
+| Drifting per-item residual model                      | Ronak    | Nov 2          | Code on `main` (`drift_irt.py`, `analyze_drift_irt.py`); results not recorded                                                                                     |
+| Log-space BKT                                         | Bhagyesh | Nov 2          | Not started (no `bkt.py`)                                                                                                                                         |
+| Chain-of-thought direction in `docs/project-notes.md` | Bhagyesh | Oct 26         | Done Oct 27 (`docs/project-notes.md` §8)                                                                                                                          |
+| Chance-adjusted forgetting check                      | Aniket   | Oct 26         | Code on `main` (`chance_check`, `letter_check`, `run_forgetting.py --chance-check`); re-run not recorded                                                          |
+| Held-out test of fitted trajectories                  | Aniket   | Nov 2          | Not started                                                                                                                                                       |
+| Phase 2 GPU pilot and cost estimate; go/no-go         | Aniket   | Nov 25; Dec 12 | On the calendar                                                                                                                                                   |
+
 **Everyone:** read `meetings/2026-10-19-advisor.md` and correct anything you remember differently before the next team meeting.
 
 ---
@@ -167,17 +204,17 @@ Owners follow the track split from Sep 29 (Ronak: data, harness, visualization; 
 
 ## 9. Where everything lives
 
-| Document | What it is |
-|---|---|
-| `docs/project-notes.md` | Decisions 1–5 with pros/cons, data verification, lit-review consequences, roadmap, risks |
-| `docs/abstract-v2.md` | Revised abstract with change log |
-| `docs/research-brief.md` | The brief given to the research agents; also records measured findings |
-| `docs/lit-review-2026-09-30.md` | Five-priority literature review; §9b has the corrections and supersedes earlier recommendations |
-| `docs/workbook/Workbook1.pdf` | The submission; `build/content.py` (gitignored) is its source |
-| `docs/workbook/Workbook1-review-2026-09-30.md`, `Workbook1-followup-review-2026-09-30.md` | The two independent audits |
-| `docs/presentation-script.md` | Speaker notes for the Workbook 1 presentation |
-| `meetings/` | One note per meeting, Aug 31 to Oct 19 |
-| `README.md` | Setup, ingest, plot, run baselines and models |
-| `data/processed/` (gitignored, rebuild with the scripts) | `fluid_responses.parquet`, baseline and model result tables, forgetting table |
+| Document                                                                                  | What it is                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/project-notes.md`                                                                   | Decisions 1–5 with pros/cons, data verification, lit-review consequences, roadmap, risks, future work (§8)                                                                                    |
+| `docs/abstract-v2.md`                                                                     | Revised abstract with change log                                                                                                                                                              |
+| `docs/research-brief.md`                                                                  | The brief given to the research agents; also records measured findings                                                                                                                        |
+| `docs/lit-review-2026-09-30.md`                                                           | Five-priority literature review; §9b has the corrections and supersedes earlier recommendations                                                                                               |
+| `docs/workbook/Workbook1.pdf`                                                             | The submission; `build/content.py` (gitignored) is its source                                                                                                                                 |
+| `docs/workbook/Workbook1-review-2026-09-30.md`, `Workbook1-followup-review-2026-09-30.md` | The two independent audits                                                                                                                                                                    |
+| `docs/presentation-script.md`                                                             | Speaker notes for the Workbook 1 presentation                                                                                                                                                 |
+| `meetings/`                                                                               | One note per meeting, Aug 31 to Oct 19                                                                                                                                                        |
+| `README.md`                                                                               | Setup, ingest, plot, run baselines                                                                                                                                                            |
+| `data/processed/` (gitignored, rebuild with the scripts)                                  | `fluid_responses.parquet`, baseline and model result tables, ladder tables (`ladder_table.csv`, `ladder_over_training.csv`, `variance_decomposition.csv`), forgetting and chance-check tables |
 
-Repo: `github.com/bhagyeshrathi07/LLM-Knowledge-Tracing`, branch `main`, head `1b032cf`.
+Repo: `github.com/bhagyeshrathi07/LLM-Knowledge-Tracing`, branch `main`, head `9135fc0` (2026-10-27; `1b032cf` at the Oct 19 briefing).

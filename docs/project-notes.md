@@ -1,6 +1,6 @@
 # Knowledge Tracing for LLMs — Project Notes
 
-Working notes for the team. Covers what we are building, what prior work exists, the design problems we found, and the decisions made so far. Last updated 2026-09-30 (week 5 of semester 1).
+Working notes for the team. Covers what we are building, what prior work exists, the design problems we found, and the decisions made so far. Last updated 2026-10-27 (week 10 of semester 1): the data tables in Sections 2 and 3 were corrected against the built Parquet table and completed items in Section 7 marked done. Design and roadmap text otherwise dates from 2026-09-30.
 
 **Status:** Decisions 1–5 adopted by the team on 2026-09-29 (Section 6); advisor sign-off on Decisions 1–2 still pending. Phase 1 data verified (Section 3). An independent review on 2026-09-30 corrected several empirical numbers, citations and method claims; see the dated corrections in Sections 3, 4 and 6 and `docs/workbook/Workbook1-review-2026-09-30.md`.
 
@@ -40,7 +40,7 @@ The mastery number differs from raw accuracy in three ways:
 - Collect item-level correctness (right or wrong on each question) for every checkpoint.
 - Phase 1: use already-published checkpoint responses from six open models (see Section 3).
 - Phase 2: run OLMo-2 intermediate checkpoints ourselves on a skill-tagged math benchmark (MathCAMPS). This needs GPU time.
-- Canonical table: `(model, checkpoint_step, tokens_seen, benchmark, item_id, skill_tags, correct)`.
+- Canonical table, as built by `src/llm_kt/ingest.py` (corrected 2026-10-27): `(model, checkpoint_idx, checkpoint_label, step, tokens_seen_b, benchmark, skill, item_id, correct)`, long format, one row per (model, checkpoint, item). `step` and `tokens_seen_b` are null where the source column names do not carry them.
 
 **Models**
 - Time step = training checkpoint. Each skill-tagged item = one noisy observation of mastery at that checkpoint.
@@ -62,14 +62,14 @@ The mastery number differs from raw accuracy in three ways:
 
 Almost certainly the **Fluid Benchmarking** data release from AI2 (COLM 2025). Needs confirmation from the team that this is what the abstract meant.
 
-| Model | Size | Trained by |
-|---|---|---|
-| Amber | 6.7B | LLM360 |
-| K2 | 65B | LLM360 |
-| OLMo-1 | 7B | AI2 |
-| OLMo-2 | 7B | AI2 |
-| Pythia | 2.8B | EleutherAI |
-| Pythia | 6.9B | EleutherAI |
+| Model  | Size | Trained by | Id in our tables |
+| ------ | ---- | ---------- | ---------------- |
+| Amber  | 6.7B | LLM360     | `amber-7b`       |
+| K2     | 65B  | LLM360     | `k2-65b`         |
+| OLMo-1 | 7B   | AI2        | `olmo1-7b`       |
+| OLMo-2 | 7B   | AI2        | `olmo2-7b`       |
+| Pythia | 2.8B | EleutherAI | `pythia-3b`      |
+| Pythia | 6.9B | EleutherAI | `pythia-7b`      |
 
 Each has 46–94 pretraining checkpoints evaluated on six benchmarks: ARC-Challenge, GSM8K, HellaSwag, MMLU, TruthfulQA, WinoGrande. Data lives at `allenai/fluid-benchmarking` on HuggingFace.
 
@@ -88,18 +88,30 @@ Files (16 total):
 
 Per model:
 
-| Model | Checkpoints | Column format |
-|---|---|---|
-| amber-7b | 73 | step |
-| k2-65b | 46 | step |
-| olmo1-7b | 83 | step |
-| olmo2-7b | 94 | `stage1-step150-tokens1B` … `stage1-step928646-tokens3896B` |
-| pythia-3b | 78 | `step0`, `step2`, `step8`, … `step143000` |
-| pythia-7b | 78 | same as pythia-3b |
+| Model     | Checkpoints | Column format (raw column names, kept as `checkpoint_label`)                              | Parsed                  |
+| --------- | ----------- | ----------------------------------------------------------------------------------------- | ----------------------- |
+| amber-7b  | 73          | `ckpt_000`, `ckpt_005`, … `ckpt_358` (LLM360 checkpoint index)                            | neither step nor tokens |
+| k2-65b    | 46          | `ckpt_093`, `ckpt_099`, … `ckpt_360` (LLM360 checkpoint index)                            | neither step nor tokens |
+| olmo1-7b  | 83          | `step0-tokens0B`, `step5000-tokens20B`, … `step650650-tokens2729B`                        | step and tokens         |
+| olmo2-7b  | 94          | `stage1-step150-tokens1B`, `stage1-step5000-tokens21B`, … `stage1-step928646-tokens3896B` | step and tokens         |
+| pythia-3b | 78          | `step0`, `step2`, `step8`, … `step143000`                                                 | step only               |
+| pythia-7b | 78          | same as pythia-3b                                                                         | step only               |
+
+(Column formats corrected 2026-10-27 against `fluid_responses.parquet`; the earlier table listed Amber, K2 and OLMo-1 as plain `step` columns.)
 
 Total: 452 checkpoints × 28,659 items, about 13M cells, no missing correctness values. (Time metadata is incomplete: `step` is null for Amber and K2, `tokens_seen_b` is null for Amber, K2 and Pythia. The Fluid paper reports 467 checkpoints including 61 for K2; the release we inspected has 452 including 46 for K2. We report the release figures.)
 
-Items per benchmark: ARC-Challenge 1,172; GSM8K 1,319; HellaSwag 10,042; MMLU 14,042; TruthfulQA 817; WinoGrande 1,267.
+Items per benchmark:
+
+| Benchmark     | Items  | Phase 1 treatment           |
+| ------------- | ------ | --------------------------- |
+| ARC-Challenge | 1,172  | one skill                   |
+| GSM8K         | 1,319  | one skill                   |
+| HellaSwag     | 10,042 | one skill                   |
+| MMLU          | 14,042 | 57 subjects, one skill each |
+| TruthfulQA    | 817    | dropped (continuous scores) |
+| WinoGrande    | 1,267  | one skill                   |
+| Total         | 28,659 | 27,842 kept                 |
 
 MMLU item ids embed the subject (e.g. `mmlu_abstract_algebra_0`). All 57 subjects present. Subjects are unbalanced: `professional_law` 1,534 items, `moral_scenarios` 895, smallest around 100.
 
@@ -306,12 +318,12 @@ Context: the primary models (BKT, temporal IRT) fit per skill. For a skill like 
 
 ### Immediate (weeks 5–8, through ~Oct 20)
 
-1. **Revise the abstract.** Advisor's last-paragraph fix; soften "goes unmeasured"; fix the "practice opportunity" framing per Decision 1.
+1. ~~Revise the abstract.~~ Done: `docs/abstract-v2.md` (advisor's last-paragraph fix; "goes unmeasured" softened to "described but not modeled"; "practice opportunity" framing removed per Decision 1).
 2. ~~Data feasibility spike.~~ Done 2026-09-29. Fluid data has per-item correctness. See Section 3.
-3. **Team sign-off on Decisions 3–5; advisor sign-off on Decisions 1–2.**
+3. ~~Team sign-off on Decisions 3–5~~ (Decisions 1–5 adopted by the team 2026-09-29); **advisor sign-off on Decisions 1–2 still to be recorded.**
 4. **Compute plan (Phase 2 only).** OLMo-2 7B has ~900 checkpoints; pick ~50–100 log-spaced. MathCAMPS is generation-based eval. Estimate GPU-hours; source access (SJSU HPC, Colab Pro, Lambda/RunPod). Get a quote before the semester 1 report. No GPU needed for Phase 1.
 5. **Related-work section.** Expand Section 4 into a formal write-up for the 295A report.
-6. **Repo and schema.** One repo. Ingest script that converts the six Fluid CSVs into the canonical Parquet table per Section 2 (long format: one row per model × checkpoint × item, with `tokens_seen` parsed from column names where available, `skill` parsed from MMLU item ids, TruthfulQA dropped). Everything downstream reads it.
+6. ~~Repo and schema.~~ Done (commit `5a4abcd`, 2026-09-30): `scripts/ingest_fluid.py` converts the six Fluid CSVs into `data/processed/fluid_responses.parquet` per Section 2 (long format: one row per model × checkpoint × item, `step` and `tokens_seen_b` parsed from column names where available, `skill` parsed from MMLU item ids, TruthfulQA dropped). Everything downstream reads it.
 7. **Split work across three tracks:** data/infra; modeling; visualization + writing. Weekly advisor meeting at a fixed slot.
 
 ### Rest of semester 1 (weeks 9–15, ~Oct 20–Dec 12)
@@ -336,3 +348,34 @@ Context: the primary models (BKT, temporal IRT) fit per skill. For a skill like 
 2. Next-checkpoint prediction is trivially easy because adjacent checkpoints are near-identical. Mitigate with wider gaps and a copy-last baseline.
 3. Skill tags limited to MMLU in Phase 1; small subjects give noisy estimates. Acceptable; state it and use the 4-category rollup.
 4. GPU access for OLMo-2 (Phase 2). Secure before December.
+
+---
+
+## 8. Future work (not this semester)
+
+### Knowledge tracing on chain-of-thought responses
+
+Raised by the advisor on 2026-10-19 (`meetings/2026-10-19-advisor.md`) as a later direction. Recorded here so it is not lost; nothing in the semester-1 or semester-2 plan depends on it.
+
+**The idea.** Same knowledge-tracing machinery, different clock. In the current project the learner is a model observed across training checkpoints. Here the learner is one fixed model observed across the turns of a single conversation, and the chain-of-thought it writes at each turn is the evidence. The quantity being traced is whether the model's working state is still grounded in the facts in play or has started to drift, and the question is what changes over a conversation that precedes a hallucination.
+
+|              | Current project                                 | Chain-of-thought variant                                                                    |
+| ------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Learner      | One model across training                       | One model across one conversation                                                           |
+| Time step    | Training checkpoint                             | Conversation turn, or a step inside a long reasoning chain                                  |
+| Observation  | Right or wrong on a skill-tagged benchmark item | Each factual claim in the chain, labeled correct or hallucinated                            |
+| Hidden state | Per-skill mastery                               | Per-topic grounding (how far the model can still be trusted on that topic)                  |
+| Validation   | Predict the next checkpoint's answers           | Predict whether the next step hallucinates, before seeing it                                |
+| Covariates   | Tokens seen between checkpoints                 | Context length, an earlier wrong premise accepted, an unanswerable question, a topic switch |
+
+**Why it fits.** Decisions 1 and 2 carry over unchanged: the time step is a point at which a batch of observations is taken (all claims in one turn), the state transitions between those points, and small interpretable models (BKT-style or temporal IRT) are the primary tools because there are few "students". The next-step prediction test is the same validation we use now.
+
+**Data it would need.** Multi-turn conversations with (a) the model's full reasoning trace at every turn and (b) a correct / hallucinated label on each claim, plus the covariates above. Pieces of this exist separately; to our knowledge none combines all three, so a usable dataset would probably have to be assembled or labeled by us. Candidate ingredients, all to be verified before use:
+
+- *Traces.* Open reasoning models publish their chains of thought (for example DeepSeek-R1 and OLMo-3 Think), so traces can be generated on any prompt set at the cost of inference.
+- *Hallucination labels.* Existing benchmarks are mostly single-turn: TruthfulQA, HaluEval, FELM, FActScore (claim-level factuality for long-form answers), RAGTruth (grounding against retrieved context). HalluDial labels hallucination in dialogue but, as far as we know, without reasoning traces.
+- *Claim labeling at scale.* Would need an automatic judge (an LLM checking each claim against a reference or retrieved evidence) with a human-labeled sample to report agreement, as planned for Option B of Decision 4.
+
+**Open questions.** What counts as a "skill" or topic in free conversation (hand-tagged domains, clustered claims, or the retrieval source); whether a step-level clock inside one long chain is too fine to carry a state; and how to separate hallucination caused by the conversation's history from hallucination the model would have produced on the first turn anyway.
+
+**Status.** Future work only. Revisit after the Phase 2 go/no-go (2026-12-12) if semester 2 has room.
