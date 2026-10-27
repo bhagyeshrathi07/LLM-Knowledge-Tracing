@@ -78,7 +78,7 @@ Metrics: **log-loss** (quality of the predicted probabilities, lower is better) 
 
 The strongest predictor with no learning in it: for each question, average how the model did on it at all previous checkpoints (item mean). One checkpoint ahead: log-loss 0.457, AUC 0.862 pooled; 0.375 ± 0.015 / 0.916 ± 0.006 on the test block.
 
-**The result the advisor cared most about.** Same slice, same horizon, log-loss: guessing from the overall score so far gives 0.70; from the model's score on that subject, 0.63; from that specific question's own history, 0.46. Knowing the subject helps little; knowing the question helps a lot. Any learner model must carry per-question difficulty or it loses. (Across all six models and all benchmarks, the same ladder is 0.661 / 0.582 / 0.360 at h = 1.)
+**The result the advisor cared most about.** Same slice, same horizon, log-loss: guessing from the overall score so far gives 0.69; from the model's score on that subject, 0.63; from that specific question's own history, 0.46. Knowing the subject helps little; knowing the question helps a lot. Any learner model must carry per-question difficulty or it loses. (Across all six models and all benchmarks, the same ladder is 0.661 / 0.582 / 0.360 at h = 1.)
 
 ### 5.2 Borrowed item difficulties lose badly
 
