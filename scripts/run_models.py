@@ -1,9 +1,14 @@
 #!/usr/bin/env python
-"""Score IRT-based predictors (static persistence, T-SKIRT) with the walk-forward harness.
+"""Score IRT-based predictors (static persistence, T-SKIRT, DriftIRT) with the walk-forward harness.
 
 Usage:
     python scripts/run_models.py --predictors tskirt static_irt --nu 0.1 0.3 --horizon 1 \
         --models olmo2-7b --benchmarks mmlu
+    python scripts/run_models.py --predictors drift_irt item_mean --q-theta 0.01 0.05 \
+        --q-delta 0.001 0.01 --delta-prior-var 1 --forecast-var-scale 0 1 \
+        --residual-scale probit --models olmo2-7b --benchmarks mmlu --tag drift
+
+DriftIRT dials are given as lists; one predictor is built per combination.
 
 Writes data/processed/models_<tag>_h<horizon>.parquet and prints a per-model summary.
 item_mean from the baseline run is included for reference when its results file exists.
@@ -12,12 +17,14 @@ item_mean from the baseline run is included for reference when its results file 
 from __future__ import annotations
 
 import argparse
+import itertools
 import time
 from pathlib import Path
 
 import pandas as pd
 
 from llm_kt.baselines import ItemMean
+from llm_kt.drift_irt import RESIDUAL_SCALES, DriftIRT
 from llm_kt.evaluate import evaluate, summarize
 from llm_kt.ingest import MODELS
 from llm_kt.static_irt import StaticIRTPersistence, load_item_params
@@ -33,7 +40,7 @@ def main() -> None:
     parser.add_argument("--models", nargs="+", default=list(MODELS), choices=MODELS)
     parser.add_argument("--benchmarks", nargs="+", default=None, help="restrict to these benchmarks (e.g. mmlu)")
     parser.add_argument("--predictors", nargs="+", default=["static_irt", "tskirt"],
-                        choices=["static_irt", "tskirt", "item_mean"])
+                        choices=["static_irt", "tskirt", "drift_irt", "item_mean"])
     parser.add_argument("--nu", nargs="+", type=float, default=[0.1], help="T-SKIRT drift values to try")
     parser.add_argument("--window", type=int, default=1, help="static IRT: checkpoints used to fit theta")
     parser.add_argument("--time-col", default="checkpoint_idx", choices=["checkpoint_idx", "step", "tokens_seen_b"])
@@ -41,6 +48,17 @@ def main() -> None:
     parser.add_argument("--tau", nargs="+", type=float, default=[1.0], help="prior sd(s) of the per-item difficulty offset")
     parser.add_argument("--tau-a", type=float, default=None,
                         help="prior sd of the per-item log-discrimination offset (default: discrimination fixed)")
+    parser.add_argument("--q-theta", nargs="+", type=float, default=[0.01],
+                        help="DriftIRT: per-step variance of the skill ability random walk")
+    parser.add_argument("--q-delta", nargs="+", type=float, default=[0.01],
+                        help="DriftIRT: per-step variance of the item residual random walk")
+    parser.add_argument("--delta-prior-var", nargs="+", type=float, default=[1.0],
+                        help="DriftIRT: prior variance of an item residual at first observation")
+    parser.add_argument("--forecast-var-scale", nargs="+", type=float, default=[1.0],
+                        help="DriftIRT: multiplier on the forecast variance (0 = plug-in forecast)")
+    parser.add_argument("--residual-scale", nargs="+", default=["difficulty"], choices=RESIDUAL_SCALES,
+                        help="DriftIRT: residual in difficulty units (z = a(theta - b - delta)) "
+                             "or probit units (z = a(theta - b) - delta)")
     parser.add_argument("--horizon", type=int, default=1)
     parser.add_argument("--min-history", type=int, default=2)
     parser.add_argument("--tag", default=None)
@@ -62,6 +80,14 @@ def main() -> None:
         predictors += [StaticIRTPersistence(params, window=args.window, tau=tau, **recal) for tau in taus]
     if "tskirt" in args.predictors:
         predictors += [TSKIRT(params, nu=nu, time_col=args.time_col, tau=tau, **recal) for nu in args.nu for tau in taus]
+    if "drift_irt" in args.predictors:
+        predictors += [
+            DriftIRT(params, q_theta=qt, q_delta=qd, delta_prior_var=pv, forecast_var_scale=fv,
+                     time_col=args.time_col, residual_scale=rs)
+            for qt, qd, pv, fv, rs in itertools.product(
+                args.q_theta, args.q_delta, args.delta_prior_var, args.forecast_var_scale,
+                args.residual_scale)
+        ]
 
     t0 = time.time()
     results = evaluate(responses, predictors, min_history=args.min_history, horizon=args.horizon)
