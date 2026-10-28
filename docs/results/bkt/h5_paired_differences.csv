@@ -1,0 +1,17 @@
+comparison,a,b,scope,metric,n,n_slices,n_clusters,diff,se,ci_low,ci_high
+"h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean",bkt_k0.1_r0.9_skill,item_mean,pooled,log_loss,1235696,5016,57,-0.034165778565233444,0.005863547064777339,-0.04358326419484715,-0.02242639361270358
+"h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean",bkt_k0.1_r0.9_skill,item_mean,pooled,auc,1235696,5016,57,0.01716197573275847,0.0006635213685136795,0.01585715888456075,0.01829101814386394
+"h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean",bkt_k0.1_r0.9_skill,item_mean,test,log_loss,266798,1083,57,-0.0590437639124848,0.008627807863394208,-0.07128393081854031,-0.040715955751860024
+"h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean",bkt_k0.1_r0.9_skill,item_mean,test,auc,266798,1083,57,0.015836978771890643,0.0015202702002070274,0.01239103252058553,0.01875707693258355
+"h=5, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean",bkt_k1_r0.9_fluid_lo-2_hi1,item_mean,pooled,log_loss,1235696,5016,57,-0.07948849809627032,0.009168100150731877,-0.09567133051396001,-0.06021295929245879
+"h=5, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean",bkt_k1_r0.9_fluid_lo-2_hi1,item_mean,pooled,auc,1235696,5016,57,0.025235321218094506,0.0016732079509825424,0.021774610761871708,0.027849241585499163
+"h=5, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean",bkt_k1_r0.9_fluid_lo-2_hi1,item_mean,test,log_loss,266798,1083,57,-0.056567569255621744,0.007038617116715006,-0.06845798059008244,-0.041388658735114436
+"h=5, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean",bkt_k1_r0.9_fluid_lo-2_hi1,item_mean,test,auc,266798,1083,57,0.013278257612954862,0.0019809684182939403,0.009509882554055563,0.016926963553707687
+"h=5, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean",bkt_k1e+06_r1_skill,item_mean,pooled,log_loss,1235696,5016,57,0.15950661566397767,0.010379897889492553,0.1359181540749646,0.1760269422248137
+"h=5, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean",bkt_k1e+06_r1_skill,item_mean,pooled,auc,1235696,5016,57,-0.3511042907121293,0.005197247197814491,-0.3597465860518598,-0.33947229781510446
+"h=5, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean",bkt_k1e+06_r1_skill,item_mean,test,log_loss,266798,1083,57,0.24163247549127712,0.014206714355243337,0.21051132995966432,0.26314508820883886
+"h=5, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean",bkt_k1e+06_r1_skill,item_mean,test,auc,266798,1083,57,-0.41216009598417347,0.005636828901718063,-0.4214488083575204,-0.39924025151093495
+"h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9",bkt_k0.1_r0.9_skill,item_mean_ewma_r0.9,pooled,log_loss,1235696,5016,57,0.02002553102334205,0.0025515487078021037,0.01619301056575207,0.026157792123490304
+"h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9",bkt_k0.1_r0.9_skill,item_mean_ewma_r0.9,pooled,auc,1235696,5016,57,-3.123613238145372e-05,0.000614021734582172,-0.0014183544318924857,0.0007265677130944921
+"h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9",bkt_k0.1_r0.9_skill,item_mean_ewma_r0.9,test,log_loss,266798,1083,57,-0.0021017905048885265,0.00479530222448125,-0.008490376910506806,0.008050524892529845
+"h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9",bkt_k0.1_r0.9_skill,item_mean_ewma_r0.9,test,auc,266798,1083,57,-0.0010001602053006464,0.0009153266969218758,-0.003007468131818708,3.321931683132433e-05

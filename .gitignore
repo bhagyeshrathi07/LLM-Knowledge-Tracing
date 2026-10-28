@@ -229,4 +229,4 @@ data/processed/*
 # Internal team briefing, not published
 # docs/team-briefing.md
 docs/advisor-briefing-*.html
-docs/figures
+.superpowers

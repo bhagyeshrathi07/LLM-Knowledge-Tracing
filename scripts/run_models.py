@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Score IRT-based predictors (static persistence, T-SKIRT, DriftIRT) with the walk-forward harness.
+"""Score learner models (static IRT, T-SKIRT, DriftIRT, BKT) with the walk-forward harness.
 
 Usage:
     python scripts/run_models.py --predictors tskirt static_irt --nu 0.1 0.3 --horizon 1 \
@@ -8,7 +8,15 @@ Usage:
         --q-delta 0.001 0.01 --delta-prior-var 1 --forecast-var-scale 0 1 \
         --residual-scale probit --models olmo2-7b --benchmarks mmlu --tag drift
 
-DriftIRT dials are given as lists; one predictor is built per combination.
+    python scripts/run_models.py --predictors bkt item_mean skill_mean --kappa 1 5 20 100 1e6 \
+        --rho 1.0 0.9 0.7 --anchor skill fluid --theta-lo -1 -2 --theta-hi 1 2 \
+        --models olmo2-7b --benchmarks mmlu --tag bkt_grid
+    python scripts/run_models.py --predictors item_mean_ewma --rho 0.9 --horizon 1 \
+        --models olmo2-7b --benchmarks mmlu --tag bkt_ewma   # recency-weighted item mean control
+
+DriftIRT and BKT dials are given as lists; one predictor is built per combination. BKT
+combinations that give an identical predictor (theta values under the skill anchor, rho at
+kappa >= 1e5 where items are pinned to the anchor) are built once.
 
 Writes data/processed/models_<tag>_h<horizon>.parquet and prints a per-model summary.
 item_mean from the baseline run is included for reference when its results file exists.
@@ -23,7 +31,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from llm_kt.baselines import ItemMean
+from llm_kt.baselines import ItemMean, ItemMeanEWMA, SkillMean
+from llm_kt.bkt import ANCHORS, BKT, KAPPA_LIMIT
 from llm_kt.drift_irt import RESIDUAL_SCALES, DriftIRT
 from llm_kt.evaluate import evaluate, summarize
 from llm_kt.ingest import MODELS
@@ -40,7 +49,7 @@ def main() -> None:
     parser.add_argument("--models", nargs="+", default=list(MODELS), choices=MODELS)
     parser.add_argument("--benchmarks", nargs="+", default=None, help="restrict to these benchmarks (e.g. mmlu)")
     parser.add_argument("--predictors", nargs="+", default=["static_irt", "tskirt"],
-                        choices=["static_irt", "tskirt", "drift_irt", "item_mean"])
+                        choices=["static_irt", "tskirt", "drift_irt", "bkt", "item_mean", "item_mean_ewma", "skill_mean"])
     parser.add_argument("--nu", nargs="+", type=float, default=[0.1], help="T-SKIRT drift values to try")
     parser.add_argument("--window", type=int, default=1, help="static IRT: checkpoints used to fit theta")
     parser.add_argument("--time-col", default="checkpoint_idx", choices=["checkpoint_idx", "step", "tokens_seen_b"])
@@ -59,6 +68,16 @@ def main() -> None:
     parser.add_argument("--residual-scale", nargs="+", default=["difficulty"], choices=RESIDUAL_SCALES,
                         help="DriftIRT: residual in difficulty units (z = a(theta - b - delta)) "
                              "or probit units (z = a(theta - b) - delta)")
+    parser.add_argument("--kappa", nargs="+", type=float, default=[5.0],
+                        help="BKT: pseudo-count shrinking per-item guess/slip toward the anchor")
+    parser.add_argument("--rho", nargs="+", type=float, default=[1.0],
+                        help="BKT: recency weight per checkpoint for the per-item step (1 = none)")
+    parser.add_argument("--anchor", nargs="+", default=["skill"], choices=ANCHORS,
+                        help="BKT: anchor for per-item guess/slip (skill-shared or Fluid 2PL)")
+    parser.add_argument("--theta-lo", nargs="+", type=float, default=[-1.0],
+                        help="BKT fluid anchor: ability whose 2PL probability is the item's guess")
+    parser.add_argument("--theta-hi", nargs="+", type=float, default=[1.0],
+                        help="BKT fluid anchor: ability whose 2PL probability is 1 - slip")
     parser.add_argument("--horizon", type=int, default=1)
     parser.add_argument("--min-history", type=int, default=2)
     parser.add_argument("--tag", default=None)
@@ -73,6 +92,10 @@ def main() -> None:
     predictors = []
     if "item_mean" in args.predictors:
         predictors.append(ItemMean())
+    if "item_mean_ewma" in args.predictors:
+        predictors += [ItemMeanEWMA(rho=rho) for rho in args.rho]
+    if "skill_mean" in args.predictors:
+        predictors.append(SkillMean())
     # one predictor per tau when recalibrating (names carry tau and tau_a); tau is unused otherwise
     taus = args.tau if args.recalibrate else args.tau[:1]
     recal = {"recalibrate": args.recalibrate, "tau_a": args.tau_a}
@@ -88,6 +111,19 @@ def main() -> None:
                 args.q_theta, args.q_delta, args.delta_prior_var, args.forecast_var_scale,
                 args.residual_scale)
         ]
+
+    if "bkt" in args.predictors:
+        seen = set()
+        for kappa, rho, anchor, lo, hi in itertools.product(
+                args.kappa, args.rho, args.anchor, args.theta_lo, args.theta_hi):
+            if kappa >= KAPPA_LIMIT:
+                rho = 1.0  # items are pinned to the anchor; rho has no effect
+            if anchor == "skill":
+                lo, hi = -1.0, 1.0  # thetas unused
+            m = BKT(kappa=kappa, rho=rho, anchor=anchor, item_params=params, theta_lo=lo, theta_hi=hi)
+            if m.name not in seen:
+                seen.add(m.name)
+                predictors.append(m)
 
     t0 = time.time()
     results = evaluate(responses, predictors, min_history=args.min_history, horizon=args.horizon)

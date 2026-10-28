@@ -1,0 +1,426 @@
+Validation block, every predictor (lower log_loss better)
+                                   n  log_loss   brier  accuracy     auc
+predictor                                                               
+bkt_k0.1_r0.9_skill           266798    0.3258  0.1035    0.8500  0.9254
+bkt_k0.3_r0.9_skill           266798    0.3260  0.1036    0.8502  0.9253
+bkt_k0.03_r0.9_skill          266798    0.3266  0.1036    0.8496  0.9251
+bkt_k1_r0.9_fluid_lo-2_hi1    266798    0.3311  0.1051    0.8489  0.9226
+item_mean_ewma_r0.9           266798    0.3324  0.1031    0.8520  0.9269
+bkt_k1_r0.9_fluid_lo-1_hi1    266798    0.3389  0.1077    0.8452  0.9215
+bkt_k0.3_r0.7_skill           266798    0.3472  0.1089    0.8442  0.9193
+bkt_k1_r0.9_skill             266798    0.3506  0.1099    0.8506  0.9247
+bkt_k0.1_r0.7_skill           266798    0.3525  0.1097    0.8433  0.9194
+bkt_k5_r0.9_fluid_lo-2_hi1    266798    0.3538  0.1106    0.8431  0.9206
+bkt_k1_r0.9_fluid_lo-1_hi2    266798    0.3552  0.1122    0.8367  0.9195
+bkt_k1_r0.7_fluid_lo-2_hi1    266798    0.3589  0.1136    0.8381  0.9147
+bkt_k1_r1_fluid_lo-2_hi1      266798    0.3597  0.1147    0.8333  0.9139
+bkt_k1_r1_fluid_lo-1_hi1      266798    0.3603  0.1151    0.8327  0.9132
+bkt_k0.03_r0.7_skill          266798    0.3603  0.1100    0.8433  0.9194
+bkt_k5_r1_fluid_lo-2_hi1      266798    0.3653  0.1171    0.8313  0.9112
+bkt_k5_r1_fluid_lo-1_hi1      266798    0.3679  0.1182    0.8301  0.9092
+bkt_k0.3_r1_skill             266798    0.3702  0.1181    0.8310  0.9097
+bkt_k20_r1_fluid_lo-2_hi1     266798    0.3710  0.1175    0.8332  0.9105
+bkt_k1_r1_fluid_lo-1_hi2      266798    0.3728  0.1194    0.8278  0.9104
+bkt_k0.1_r1_skill             266798    0.3745  0.1188    0.8299  0.9102
+bkt_k1_r0.7_fluid_lo-1_hi1    266798    0.3747  0.1186    0.8313  0.9122
+bkt_k1_r0.7_fluid_lo-1_hi2    266798    0.3755  0.1174    0.8307  0.9127
+bkt_k5_r0.9_fluid_lo-1_hi1    266798    0.3770  0.1190    0.8282  0.9168
+bkt_k5_r0.9_fluid_lo-1_hi2    266798    0.3771  0.1172    0.8334  0.9192
+bkt_k5_r1_fluid_lo-1_hi2      266798    0.3796  0.1217    0.8237  0.9093
+bkt_k1_r1_skill               266798    0.3804  0.1218    0.8317  0.9101
+bkt_k0.03_r1_skill            266798    0.3808  0.1199    0.8290  0.9098
+bkt_k20_r1_fluid_lo-1_hi2     266798    0.3818  0.1216    0.8245  0.9101
+bkt_k20_r1_fluid_lo-1_hi1     266798    0.3824  0.1221    0.8233  0.9085
+bkt_k5_r0.7_fluid_lo-2_hi1    266798    0.3847  0.1207    0.8363  0.9095
+item_mean                     266798    0.3859  0.1205    0.8284  0.9116
+bkt_k1_r0.7_skill             266798    0.3901  0.1210    0.8405  0.9165
+bkt_k20_r0.9_fluid_lo-2_hi1   266798    0.3972  0.1257    0.8305  0.9056
+bkt_k5_r0.7_fluid_lo-1_hi1    266798    0.3983  0.1259    0.8256  0.9061
+bkt_k5_r0.7_fluid_lo-1_hi2    266798    0.4002  0.1271    0.8247  0.9080
+bkt_k100_r1_fluid_lo-2_hi1    266798    0.4063  0.1292    0.8257  0.8973
+bkt_k20_r0.9_fluid_lo-1_hi1   266798    0.4065  0.1293    0.8221  0.9029
+bkt_k20_r0.9_fluid_lo-1_hi2   266798    0.4075  0.1310    0.8172  0.9055
+bkt_k100_r1_fluid_lo-1_hi1    266798    0.4080  0.1298    0.8253  0.8957
+bkt_k5_r1_skill               266798    0.4135  0.1316    0.8311  0.9075
+bkt_k100_r1_fluid_lo-1_hi2    266798    0.4155  0.1345    0.8100  0.8952
+bkt_k5_r0.9_skill             266798    0.4199  0.1297    0.8446  0.9204
+bkt_k20_r1_skill              266798    0.4281  0.1342    0.8292  0.9099
+bkt_k20_r0.7_fluid_lo-2_hi1   266798    0.4304  0.1389    0.8154  0.8817
+bkt_k20_r0.7_fluid_lo-1_hi1   266798    0.4319  0.1394    0.8138  0.8803
+bkt_k20_r0.7_fluid_lo-1_hi2   266798    0.4383  0.1440    0.7963  0.8801
+bkt_k100_r0.9_fluid_lo-2_hi1  266798    0.4434  0.1444    0.8064  0.8697
+bkt_k100_r0.9_fluid_lo-1_hi1  266798    0.4451  0.1450    0.8042  0.8670
+bkt_k100_r0.9_fluid_lo-1_hi2  266798    0.4518  0.1495    0.7893  0.8654
+bkt_k100_r0.7_fluid_lo-2_hi1  266798    0.4573  0.1500    0.7934  0.8551
+bkt_k100_r0.7_fluid_lo-1_hi1  266798    0.4586  0.1504    0.7930  0.8530
+bkt_k100_r0.7_fluid_lo-1_hi2  266798    0.4667  0.1550    0.7766  0.8504
+bkt_k1e+06_r1_fluid_lo-2_hi1  266798    0.4668  0.1535    0.7827  0.8448
+bkt_k1e+06_r1_fluid_lo-1_hi1  266798    0.4683  0.1539    0.7831  0.8424
+bkt_k1e+06_r1_fluid_lo-1_hi2  266798    0.4769  0.1583    0.7685  0.8399
+bkt_k5_r0.7_skill             266798    0.4809  0.1521    0.8288  0.9153
+bkt_k20_r0.9_skill            266798    0.4909  0.1563    0.8185  0.9261
+bkt_k100_r1_skill             266798    0.4963  0.1591    0.8037  0.9124
+bkt_k20_r0.7_skill            266798    0.5608  0.1879    0.7299  0.9196
+bkt_k100_r0.9_skill           266798    0.5857  0.1994    0.6937  0.9269
+bkt_k100_r0.7_skill           266798    0.6131  0.2119    0.6688  0.9196
+skill_mean                    266798    0.6255  0.2176    0.6587  0.5000
+bkt_k1e+06_r1_skill           266798    0.6299  0.2196    0.6577  0.5000
+
+Selected on validation log-loss: skill anchor bkt_k0.1_r0.9_skill; fluid anchor bkt_k1_r0.9_fluid_lo-2_hi1
+
+h=1, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                          
+pooled bkt_k0.1_r0.9_skill  1291864    0.4106       0.0140  0.8799  0.0053
+       item_mean            1291864    0.4569       0.0070  0.8620  0.0051
+val    bkt_k0.1_r0.9_skill   266798    0.3258       0.0159  0.9254  0.0050
+       item_mean             266798    0.3859       0.0100  0.9116  0.0047
+test   bkt_k0.1_r0.9_skill   266798    0.3095       0.0228  0.9327  0.0063
+       item_mean             266798    0.3747       0.0145  0.9157  0.0057
+
+h=1, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean: paired difference, bkt_k0.1_r0.9_skill minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0463  0.0071 -0.0582  -0.0319      5244
+       auc       0.0179  0.0005  0.0168   0.0188      5244
+val    log_loss -0.0601  0.0069 -0.0714  -0.0464      1083
+       auc       0.0138  0.0012  0.0114   0.0158      1083
+test   log_loss -0.0652  0.0089 -0.0781  -0.0454      1083
+       auc       0.0169  0.0015  0.0136   0.0198      1083
+
+h=1, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k1_r0.9_fluid_lo-2_hi1  1291864    0.3877       0.0152  0.8820  0.0064
+       item_mean                   1291864    0.4569       0.0070  0.8620  0.0051
+val    bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3311       0.0163  0.9226  0.0056
+       item_mean                    266798    0.3859       0.0100  0.9116  0.0047
+test   bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3163       0.0224  0.9294  0.0070
+       item_mean                    266798    0.3747       0.0145  0.9157  0.0057
+
+h=1, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean: paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0692  0.0083 -0.0830  -0.0521      5244
+       auc       0.0201  0.0016  0.0169   0.0226      5244
+val    log_loss -0.0548  0.0073 -0.0675  -0.0388      1083
+       auc       0.0110  0.0016  0.0071   0.0136      1083
+test   log_loss -0.0585  0.0085 -0.0725  -0.0391      1083
+       auc       0.0136  0.0022  0.0088   0.0173      1083
+
+h=1, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                          
+pooled bkt_k1e+06_r1_skill  1291864    0.6365       0.0082  0.5000  0.0000
+       item_mean            1291864    0.4569       0.0070  0.8620  0.0051
+val    bkt_k1e+06_r1_skill   266798    0.6299       0.0104  0.5000  0.0000
+       item_mean             266798    0.3859       0.0100  0.9116  0.0047
+test   bkt_k1e+06_r1_skill   266798    0.6231       0.0114  0.5000  0.0000
+       item_mean             266798    0.3747       0.0145  0.9157  0.0057
+
+h=1, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean: paired difference, bkt_k1e+06_r1_skill minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss  0.1796  0.0110  0.1545   0.1965      5244
+       auc      -0.3620  0.0051 -0.3705  -0.3502      5244
+val    log_loss  0.2440  0.0107  0.2188   0.2598      1083
+       auc      -0.4116  0.0045 -0.4189  -0.4019      1083
+test   log_loss  0.2484  0.0146  0.2162   0.2703      1083
+       auc      -0.4157  0.0056 -0.4249  -0.4028      1083
+
+h=1, per-skill limit (bkt_k1e+06_r1_skill) vs skill_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se  auc  auc_se
+scope  predictor                                                       
+pooled bkt_k1e+06_r1_skill  1291864    0.6365       0.0082  0.5     0.0
+       skill_mean           1291864    0.6316       0.0088  0.5     0.0
+val    bkt_k1e+06_r1_skill   266798    0.6299       0.0104  0.5     0.0
+       skill_mean            266798    0.6255       0.0114  0.5     0.0
+test   bkt_k1e+06_r1_skill   266798    0.6231       0.0114  0.5     0.0
+       skill_mean            266798    0.6178       0.0129  0.5     0.0
+
+h=1, per-skill limit (bkt_k1e+06_r1_skill) vs skill_mean: paired difference, bkt_k1e+06_r1_skill minus skill_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss  0.0049  0.0005  0.0038   0.0058      5244
+       auc       0.0000  0.0000  0.0000   0.0000      5244
+val    log_loss  0.0043  0.0005  0.0034   0.0051      1083
+       auc       0.0000  0.0000  0.0000   0.0000      1083
+test   log_loss  0.0053  0.0006  0.0043   0.0064      1083
+       auc       0.0000  0.0000  0.0000   0.0000      1083
+
+h=1, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                          
+pooled bkt_k0.1_r0.9_skill  1291864    0.4106       0.0140  0.8799  0.0053
+       item_mean_ewma_r0.9  1291864    0.4025       0.0106  0.8802  0.0049
+val    bkt_k0.1_r0.9_skill   266798    0.3258       0.0159  0.9254  0.0050
+       item_mean_ewma_r0.9   266798    0.3324       0.0133  0.9269  0.0045
+test   bkt_k0.1_r0.9_skill   266798    0.3095       0.0228  0.9327  0.0063
+       item_mean_ewma_r0.9   266798    0.3165       0.0186  0.9334  0.0056
+
+h=1, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9: paired difference, bkt_k0.1_r0.9_skill minus item_mean_ewma_r0.9
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss  0.0081  0.0034  0.0030   0.0159      5244
+       auc      -0.0003  0.0005 -0.0015   0.0005      5244
+val    log_loss -0.0066  0.0033 -0.0116   0.0004      1083
+       auc      -0.0015  0.0010 -0.0037  -0.0001      1083
+test   log_loss -0.0070  0.0043 -0.0126   0.0023      1083
+       auc      -0.0008  0.0007 -0.0023   0.0000      1083
+
+h=1, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k1_r0.9_fluid_lo-2_hi1  1291864    0.3877       0.0152  0.8820  0.0064
+       item_mean_ewma_r0.9         1291864    0.4025       0.0106  0.8802  0.0049
+val    bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3311       0.0163  0.9226  0.0056
+       item_mean_ewma_r0.9          266798    0.3324       0.0133  0.9269  0.0045
+test   bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3163       0.0224  0.9294  0.0070
+       item_mean_ewma_r0.9          266798    0.3165       0.0186  0.9334  0.0056
+
+h=1, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus item_mean_ewma_r0.9
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0148  0.0047 -0.0230  -0.0053      5244
+       auc       0.0019  0.0017 -0.0019   0.0045      5244
+val    log_loss -0.0013  0.0040 -0.0084   0.0072      1083
+       auc      -0.0043  0.0019 -0.0086  -0.0015      1083
+test   log_loss -0.0002  0.0045 -0.0084   0.0088      1083
+       auc      -0.0041  0.0015 -0.0074  -0.0019      1083
+
+h=1, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k0.1_r0.9_skill         1291864    0.4106       0.0140  0.8799  0.0053
+       bkt_k1_r0.9_fluid_lo-2_hi1  1291864    0.3877       0.0150  0.8820  0.0062
+val    bkt_k0.1_r0.9_skill          266798    0.3258       0.0159  0.9254  0.0050
+       bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3311       0.0164  0.9226  0.0056
+test   bkt_k0.1_r0.9_skill          266798    0.3095       0.0228  0.9327  0.0063
+       bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3163       0.0219  0.9294  0.0066
+
+h=1, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus bkt_k0.1_r0.9_skill
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0229  0.0024 -0.0271  -0.0188      5244
+       auc       0.0022  0.0014 -0.0006   0.0043      5244
+val    log_loss  0.0053  0.0022  0.0017   0.0097      1083
+       auc      -0.0028  0.0013 -0.0054  -0.0010      1083
+test   log_loss  0.0067  0.0028  0.0023   0.0133      1083
+       auc      -0.0033  0.0011 -0.0056  -0.0014      1083
+
+h=1, best skill-anchored with rho = 1 vs item_mean (bkt_k0.3_r1_skill vs item_mean): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                        
+pooled bkt_k0.3_r1_skill  1291864    0.4517       0.0127  0.8622  0.0059
+       item_mean          1291864    0.4569       0.0070  0.8620  0.0051
+val    bkt_k0.3_r1_skill   266798    0.3702       0.0150  0.9097  0.0060
+       item_mean           266798    0.3859       0.0100  0.9116  0.0047
+test   bkt_k0.3_r1_skill   266798    0.3613       0.0188  0.9148  0.0066
+       item_mean           266798    0.3747       0.0145  0.9157  0.0057
+
+h=1, best skill-anchored with rho = 1 vs item_mean (bkt_k0.3_r1_skill vs item_mean): paired difference, bkt_k0.3_r1_skill minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0052  0.0056 -0.0144   0.0064      5244
+       auc       0.0002  0.0011 -0.0027   0.0019      5244
+val    log_loss -0.0157  0.0059 -0.0262  -0.0040      1083
+       auc      -0.0019  0.0021 -0.0072   0.0011      1083
+test   log_loss -0.0134  0.0045 -0.0212  -0.0046      1083
+       auc      -0.0010  0.0014 -0.0047   0.0011      1083
+
+h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                          
+pooled bkt_k0.1_r0.9_skill  1235696    0.4502       0.0110  0.8683  0.0054
+       item_mean            1235696    0.4843       0.0054  0.8511  0.0052
+test   bkt_k0.1_r0.9_skill   266798    0.3234       0.0221  0.9280  0.0063
+       item_mean             266798    0.3824       0.0141  0.9122  0.0057
+
+h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean: paired difference, bkt_k0.1_r0.9_skill minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0342  0.0059 -0.0436  -0.0224      5016
+       auc       0.0172  0.0007  0.0159   0.0183      5016
+test   log_loss -0.0590  0.0086 -0.0713  -0.0407      1083
+       auc       0.0158  0.0015  0.0124   0.0188      1083
+
+h=5, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k1_r0.9_fluid_lo-2_hi1  1235696    0.4048       0.0142  0.8763  0.0065
+       item_mean                   1235696    0.4843       0.0054  0.8511  0.0052
+test   bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3258       0.0206  0.9254  0.0067
+       item_mean                    266798    0.3824       0.0141  0.9122  0.0057
+
+h=5, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean: paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0795  0.0092 -0.0957  -0.0602      5016
+       auc       0.0252  0.0017  0.0218   0.0278      5016
+test   log_loss -0.0566  0.0070 -0.0685  -0.0414      1083
+       auc       0.0133  0.0020  0.0095   0.0169      1083
+
+h=5, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                          
+pooled bkt_k1e+06_r1_skill  1235696    0.6438       0.0082  0.5000  0.0000
+       item_mean            1235696    0.4843       0.0054  0.8511  0.0052
+test   bkt_k1e+06_r1_skill   266798    0.6240       0.0114  0.5000  0.0000
+       item_mean             266798    0.3824       0.0141  0.9122  0.0057
+
+h=5, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean: paired difference, bkt_k1e+06_r1_skill minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss  0.1595  0.0104  0.1359   0.1760      5016
+       auc      -0.3511  0.0052 -0.3597  -0.3395      5016
+test   log_loss  0.2416  0.0142  0.2105   0.2631      1083
+       auc      -0.4122  0.0056 -0.4214  -0.3992      1083
+
+h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                          
+pooled bkt_k0.1_r0.9_skill  1235696    0.4502       0.0110  0.8683  0.0054
+       item_mean_ewma_r0.9  1235696    0.4301       0.0086  0.8683  0.0050
+test   bkt_k0.1_r0.9_skill   266798    0.3234       0.0221  0.9280  0.0063
+       item_mean_ewma_r0.9   266798    0.3255       0.0176  0.9290  0.0054
+
+h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9: paired difference, bkt_k0.1_r0.9_skill minus item_mean_ewma_r0.9
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss  0.0200  0.0026  0.0162   0.0262      5016
+       auc      -0.0000  0.0006 -0.0014   0.0007      5016
+test   log_loss -0.0021  0.0048 -0.0085   0.0081      1083
+       auc      -0.0010  0.0009 -0.0030   0.0000      1083
+
+h=5, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k1_r0.9_fluid_lo-2_hi1  1235696    0.4048       0.0142  0.8763  0.0065
+       item_mean_ewma_r0.9         1235696    0.4301       0.0086  0.8683  0.0050
+test   bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3258       0.0206  0.9254  0.0067
+       item_mean_ewma_r0.9          266798    0.3255       0.0176  0.9290  0.0054
+
+h=5, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus item_mean_ewma_r0.9
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0253  0.0056 -0.0350  -0.0139      5016
+       auc       0.0080  0.0018  0.0038   0.0107      5016
+test   log_loss  0.0004  0.0038 -0.0065   0.0084      1083
+       auc      -0.0036  0.0014 -0.0067  -0.0014      1083
+
+h=5, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k0.1_r0.9_skill         1235696    0.4502       0.0110  0.8683  0.0054
+       bkt_k1_r0.9_fluid_lo-2_hi1  1235696    0.4048       0.0140  0.8763  0.0063
+test   bkt_k0.1_r0.9_skill          266798    0.3234       0.0221  0.9280  0.0063
+       bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3258       0.0203  0.9254  0.0063
+
+h=5, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus bkt_k0.1_r0.9_skill
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0453  0.0041 -0.0527  -0.0377      5016
+       auc       0.0081  0.0013  0.0052   0.0103      5016
+test   log_loss  0.0025  0.0033 -0.0026   0.0095      1083
+       auc      -0.0026  0.0010 -0.0047  -0.0010      1083
+
+h=20, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                          
+pooled bkt_k0.1_r0.9_skill  1025066    0.5250       0.0102  0.8442  0.0059
+       item_mean            1025066    0.5449       0.0048  0.8255  0.0057
+test   bkt_k0.1_r0.9_skill   266798    0.3585       0.0198  0.9137  0.0062
+       item_mean             266798    0.4136       0.0129  0.8976  0.0062
+
+h=20, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean: paired difference, bkt_k0.1_r0.9_skill minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0200  0.0065 -0.0307  -0.0066      4161
+       auc       0.0186  0.0007  0.0172   0.0199      4161
+test   log_loss -0.0551  0.0075 -0.0665  -0.0394      1083
+       auc       0.0160  0.0009  0.0142   0.0179      1083
+
+h=20, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k1_r0.9_fluid_lo-2_hi1  1025066    0.4362       0.0143  0.8653  0.0075
+       item_mean                   1025066    0.5449       0.0048  0.8255  0.0057
+test   bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3561       0.0195  0.9120  0.0070
+       item_mean                    266798    0.4136       0.0129  0.8976  0.0062
+
+h=20, best Fluid-anchored (bkt_k1_r0.9_fluid_lo-2_hi1) vs item_mean: paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.1088  0.0117 -0.1285  -0.0853      4161
+       auc       0.0398  0.0021  0.0349   0.0430      4161
+test   log_loss -0.0575  0.0072 -0.0688  -0.0416      1083
+       auc       0.0144  0.0018  0.0104   0.0174      1083
+
+h=20, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                          
+pooled bkt_k1e+06_r1_skill  1025066    0.6486       0.0083  0.5000  0.0000
+       item_mean            1025066    0.5449       0.0048  0.8255  0.0057
+test   bkt_k1e+06_r1_skill   266798    0.6270       0.0113  0.5000  0.0000
+       item_mean             266798    0.4136       0.0129  0.8976  0.0062
+
+h=20, per-skill limit (bkt_k1e+06_r1_skill) vs item_mean: paired difference, bkt_k1e+06_r1_skill minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss  0.1037  0.0103  0.0850   0.1227      4161
+       auc      -0.3255  0.0059 -0.3360  -0.3124      4161
+test   log_loss  0.2134  0.0129  0.1856   0.2337      1083
+       auc      -0.3976  0.0060 -0.4075  -0.3838      1083
+
+h=20, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9: scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                  n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                          
+pooled bkt_k0.1_r0.9_skill  1025066    0.5250       0.0102  0.8442  0.0059
+       item_mean_ewma_r0.9  1025066    0.4869       0.0063  0.8441  0.0053
+test   bkt_k0.1_r0.9_skill   266798    0.3585       0.0198  0.9137  0.0062
+       item_mean_ewma_r0.9   266798    0.3554       0.0167  0.9144  0.0059
+
+h=20, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean_ewma_r0.9: paired difference, bkt_k0.1_r0.9_skill minus item_mean_ewma_r0.9
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss  0.0381  0.0040  0.0317   0.0477      4161
+       auc       0.0001  0.0007 -0.0015   0.0010      4161
+test   log_loss  0.0031  0.0035 -0.0020   0.0112      1083
+       auc      -0.0007  0.0005 -0.0019  -0.0001      1083
+
+h=20, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k1_r0.9_fluid_lo-2_hi1  1025066    0.4362       0.0143  0.8653  0.0075
+       item_mean_ewma_r0.9         1025066    0.4869       0.0063  0.8441  0.0053
+test   bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3561       0.0195  0.9120  0.0070
+       item_mean_ewma_r0.9          266798    0.3554       0.0167  0.9144  0.0059
+
+h=20, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus item_mean_ewma_r0.9
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0507  0.0083 -0.0649  -0.0339      4161
+       auc       0.0213  0.0023  0.0156   0.0246      4161
+test   log_loss  0.0007  0.0035 -0.0056   0.0079      1083
+       auc      -0.0024  0.0016 -0.0060   0.0002      1083
+
+h=20, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k0.1_r0.9_skill         1025066    0.5250       0.0102  0.8442  0.0059
+       bkt_k1_r0.9_fluid_lo-2_hi1  1025066    0.4362       0.0142  0.8653  0.0072
+test   bkt_k0.1_r0.9_skill          266798    0.3585       0.0198  0.9137  0.0062
+       bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3561       0.0195  0.9120  0.0069
+
+h=20, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus bkt_k0.1_r0.9_skill
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0888  0.0062 -0.1007  -0.0771      4161
+       auc       0.0212  0.0018  0.0169   0.0239      4161
+test   log_loss -0.0024  0.0021 -0.0058   0.0015      1083
+       auc      -0.0017  0.0013 -0.0044   0.0005      1083
+
+Wrote /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_validation_grid.png
+Wrote /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_horizons.png
+Redrew /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_mastery_olmo2-7b.png
+Redrew /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_mastery_olmo2-7b_k1e+06_r1.png
