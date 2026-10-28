@@ -384,7 +384,7 @@ Raised by the advisor on 2026-10-19 (`meetings/2026-10-19-advisor.md`) as a late
 
 ## 9. BKT: design, why, results (2026-10-27)
 
-Action item from the 2026-10-19 advisor meeting: "log-space BKT with forgetting and per-item emissions, scored against the item-mean bar." Code: `src/llm_kt/bkt.py` (25 tests in `tests/test_bkt.py`), `scripts/run_models.py --predictors bkt`, `scripts/analyze_bkt.py`. Design document: `docs/superpowers/specs/2026-10-27-bkt-design.md`; implementation plan: `docs/superpowers/plans/2026-10-27-bkt.md`. Every table below is also stored as a CSV under `docs/results/bkt/`, with the console report in `docs/results/bkt/analysis.txt`.
+Action item from the 2026-10-19 advisor meeting: "log-space BKT with forgetting and per-item emissions, scored against the item-mean bar." Code: `src/llm_kt/bkt.py` (25 tests in `tests/test_bkt.py`), `scripts/run_models.py --predictors bkt`, `scripts/analyze_bkt.py`. Design document: `docs/superpowers/specs/2026-10-27-bkt-design.md`; implementation plan: `docs/superpowers/plans/2026-10-27-bkt.md`. Every table below is also stored as a CSV under `docs/results/bkt/`, with the console report in `docs/results/bkt/analysis.txt`. One command, `python scripts/analyze_bkt.py --mastery`, regenerates every table and all four figures (`docs/figures/bkt_validation_grid.png`, `bkt_horizons.png`, `bkt_mastery_olmo2-7b.png`, `bkt_mastery_olmo2-7b_k1e+06_r1.png`) from the stored result parquets.
 
 ### What BKT is here
 
@@ -424,7 +424,7 @@ Validation-block ranking, the one used to choose. Full table: `docs/results/bkt/
 | Skill mean                                      | 0.626        | 0.500   |
 | BKT per-skill limit (`kappa` 1e6)               | 0.630        | 0.500   |
 
-Selected: skill anchor with `kappa` 0.1 and `rho` 0.9; Fluid anchor with `theta_lo` −2, `theta_hi` 1, `kappa` 1, `rho` 0.9. Both optima sit at `rho` 0.9; `rho` 0.7 is always worse. The Fluid optimum is at its grid's lower `kappa` edge; that grid was not extended (each Fluid chunk took 3.5 hours, and the skill anchor already won at every shared `kappa`).
+The whole grid is drawn in `docs/figures/bkt_validation_grid.png` (validation log-loss against `kappa`, one line per `rho`, skill anchor solid and Fluid anchor dashed, with the item mean, the control and the per-skill limit as reference lines). Selected: skill anchor with `kappa` 0.1 and `rho` 0.9; Fluid anchor with `theta_lo` −2, `theta_hi` 1, `kappa` 1, `rho` 0.9. Both optima sit at `rho` 0.9; `rho` 0.7 is always worse. The Fluid optimum is at its grid's lower `kappa` edge; that grid was not extended (each Fluid chunk took 3.5 hours, and the skill anchor already won at every shared `kappa`).
 
 Scores for the chosen settings. "±" is a bootstrap standard error over the 57 subjects. Stored in `docs/results/bkt/h1_scores.csv`.
 
@@ -450,7 +450,7 @@ Paired differences on the test block, BKT minus the other predictor, with 95% in
 
 ### Further ahead
 
-Test-block log-loss, pooled in brackets. Horizon 5 and 20 runs use the settings chosen at horizon 1. Stored in `docs/results/bkt/h5_scores.csv`, `h20_scores.csv` and the paired-difference files.
+Test-block log-loss, pooled in brackets. Horizon 5 and 20 runs use the settings chosen at horizon 1. Drawn with standard errors in `docs/figures/bkt_horizons.png`. Stored in `docs/results/bkt/h5_scores.csv`, `h20_scores.csv` and the paired-difference files.
 
 | Horizon | Item mean     | Recency item mean | BKT skill anchor | BKT Fluid anchor | BKT skill minus item mean | BKT skill minus recency item mean |
 | ------- | ------------- | ----------------- | ---------------- | ---------------- | ------------------------- | --------------------------------- |

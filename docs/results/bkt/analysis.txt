@@ -420,62 +420,7 @@ pooled log_loss -0.0888  0.0062 -0.1007  -0.0771      4161
 test   log_loss -0.0024  0.0021 -0.0058   0.0015      1083
        auc      -0.0017  0.0013 -0.0044   0.0005      1083
 
-Wrote /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_mastery_olmo2-7b.png and the mastery / skill-parameter CSVs under /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/results/bkt
-                              skill  n_items     pi  learn  forget  guess_s  slip_s  n_iter
-                  college_chemistry      100 0.6000 0.8564  0.0629   0.3250  0.6250      13
-           college_computer_science      100 0.6000 0.7891  0.0901   0.3722  0.5778      50
-             high_school_statistics      216 0.1000 0.7691  0.0605   0.3205  0.5856       9
-              high_school_chemistry      203 0.1000 0.6833  0.0339   0.2315  0.5567       6
-                   abstract_algebra      100 0.1003 0.6727  0.0604   0.2392  0.7108      17
-                   machine_learning      112 0.1000 0.5831  0.0532   0.3135  0.5906       6
-                       formal_logic      126 0.6000 0.5094  0.1481   0.2597  0.6617      14
-                           virology      166 0.6000 0.4763  0.0377   0.3897  0.5603      11
-                   professional_law     1534 0.1000 0.4200  0.0113   0.2515  0.6000       7
-              professional_medicine      272 0.1000 0.3262  0.3527   0.4287  0.4514      32
-                       econometrics      114 0.6000 0.2764  0.0112   0.2705  0.6795      16
-                          astronomy      152 0.1000 0.2583  0.0243   0.3122  0.3914       4
-                 clinical_knowledge      265 0.1000 0.1909  0.0121   0.3022  0.4118       4
-              high_school_geography      198 0.1000 0.1840  0.0258   0.4078  0.2832      13
-          high_school_world_history      237 0.1000 0.1742  0.0123   0.3711  0.2703       4
-                    college_biology      144 0.1000 0.1726  0.0285   0.3703  0.3607       9
-                        human_aging      223 0.1000 0.1615  0.0124   0.3763  0.3649       5
-                   security_studies      245 0.1000 0.1615  0.0124   0.3789  0.3468       4
-                  international_law      121 0.1000 0.1474  0.0126   0.4081  0.3120       8
-                          nutrition      306 0.1000 0.1400  0.0127   0.3767  0.3761       4
-             electrical_engineering      145 0.1000 0.1375  0.0002   0.2916  0.4712       5
-                  computer_security      100 0.1000 0.1221  0.0002   0.3041  0.3180       4
-high_school_government_and_politics      193 0.1000 0.1167  0.0132   0.4693  0.1831       6
-                            anatomy      135 0.1000 0.1100  0.0002   0.2724  0.4897       4
-                          marketing      234 0.1000 0.1100  0.0002   0.3343  0.2167       4
-                   college_medicine      173 0.1000 0.1100  0.0002   0.2659  0.4746       5
-                         philosophy      311 0.1000 0.1100  0.0002   0.3133  0.3386       5
-                   public_relations      110 0.1000 0.1000  0.0002   0.3554  0.3923       4
-                         management      103 0.1000 0.1000  0.0002   0.3213  0.2524       4
-                          sociology      201 0.1000 0.1000  0.0002   0.3686  0.2125       4
-                    moral_scenarios      895 0.6000 0.1000  0.0002   0.2138  0.7362      50
-                    world_religions      171 0.1000 0.1000  0.0002   0.3871  0.2232       5
-                    business_ethics      100 0.1000 0.0960  0.0003   0.3218  0.4321       4
-       high_school_european_history      165 0.1000 0.0917  0.0002   0.3519  0.3107       6
-                    human_sexuality      131 0.1000 0.0917  0.0002   0.3636  0.3157       4
-                  us_foreign_policy      100 0.1000 0.0912  0.0014   0.4397  0.1982       7
-       high_school_computer_science      100 0.1000 0.0860  0.0005   0.3160  0.4574      14
-                   medical_genetics      100 0.1000 0.0851  0.0003   0.3956  0.3448       7
-         high_school_macroeconomics      390 0.1000 0.0851  0.0003   0.3063  0.4534       4
-         high_school_microeconomics      238 0.1000 0.0847  0.0003   0.3092  0.4164       7
-                      jurisprudence      108 0.1000 0.0846  0.0002   0.3772  0.3321       5
-             high_school_psychology      545 0.1000 0.0846  0.0002   0.3806  0.2294       5
-            professional_psychology      612 0.1000 0.0846  0.0002   0.3177  0.4285       4
-                         prehistory      324 0.1000 0.0846  0.0002   0.3670  0.3514       4
-                high_school_biology      310 0.1000 0.0786  0.0002   0.3565  0.3274       6
-                      miscellaneous      783 0.1000 0.0786  0.0002   0.4148  0.2451       7
-                     moral_disputes      346 0.1000 0.0786  0.0002   0.3777  0.3788       6
-                  logical_fallacies      163 0.1000 0.0647  0.0003   0.3807  0.3349       9
-                 conceptual_physics      235 0.1000 0.0616  0.0003   0.3493  0.4981       7
-             high_school_us_history      204 0.1000 0.0522  0.0003   0.4584  0.2650      10
-            high_school_mathematics      270 0.1000 0.0011  0.0200   0.2867  0.3001       3
-                college_mathematics      100 0.1000 0.0011  0.0200   0.3316  0.3000       3
-                    college_physics      102 0.1000 0.0011  0.0200   0.3104  0.3000       4
-                high_school_physics      151 0.1000 0.0011  0.0200   0.3350  0.3000       3
-                       global_facts      100 0.1000 0.0011  0.0200   0.3452  0.3000       3
-            professional_accounting      282 0.1000 0.0011  0.0200   0.3766  0.3000       3
-             elementary_mathematics      378 0.1000 0.0011  0.0200   0.3289  0.3000       3
+Wrote /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_validation_grid.png
+Wrote /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_horizons.png
+Redrew /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_mastery_olmo2-7b.png
+Redrew /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_mastery_olmo2-7b_k1e+06_r1.png

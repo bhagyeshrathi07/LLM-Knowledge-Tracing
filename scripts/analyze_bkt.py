@@ -20,10 +20,14 @@ recency weighting alone. Three further comparisons go to extra_scores.csv and
 extra_paired_differences.csv: the Fluid anchor vs the control, the Fluid anchor vs the skill
 anchor, and the best skill-anchored setting with rho = 1 (recency off) vs item_mean.
 
---mastery fits the selected skill-anchored setting once on the full OLMo-2 MMLU history and
-writes the mastery and skill-parameter CSVs and the figure docs/figures/bkt_mastery_olmo2-7b.png
-(per-subject P(learned) over training; learn vs forget). With --kappa / --rho the fit uses
-that setting instead and the figure and CSVs carry a _k<kappa>_r<rho> suffix.
+Figures, all under docs/figures/: bkt_validation_grid.png (validation log-loss against kappa per
+rho and anchor, with the references) and, when the horizon files exist, bkt_horizons.png
+(test-block log-loss and AUC against horizon). --mastery fits the selected skill-anchored
+setting and the per-skill limit (kappa 1e6, rho 1) once each on the full OLMo-2 MMLU history and
+writes the mastery and skill-parameter CSVs and bkt_mastery_olmo2-7b.png /
+bkt_mastery_olmo2-7b_k1e+06_r1.png (per-subject P(learned) over training; learn vs forget). With
+--kappa / --rho only that setting is fitted and its files carry a _k<kappa>_r<rho> suffix.
+--replot-mastery redraws the two mastery figures from the stored CSVs without refitting (seconds).
 
 Everything printed is also stored under --out-dir (default docs/results/bkt, committed, unlike
 data/processed): validation_table.csv, h{1,5,20}_scores.csv, h{1,5,20}_paired_differences.csv,
@@ -237,27 +241,178 @@ def plot_mastery(mastery: pd.DataFrame, params: pd.DataFrame, out: Path, title_s
                borderaxespad=0.0)
 
     ax2.scatter(params["learn"], params["forget"], s=18, color=MUTED, alpha=0.6, linewidths=0)
+    style_axes(ax2)
+    ax2.set_xscale("log")
+    ax2.set_yscale("log")
+    lo, hi = ax2.get_xlim()
+    ax2.set_xlim(lo, hi * 6)  # room for the labels to the right of the rightmost point
+    # highlighted subjects can share a point (e.g. both at the cold-start fixed point); a label
+    # whose point sits on an already-labelled one is stacked upward instead of overprinting
+    placed: list[tuple[float, float]] = []
     for color, skill in zip(HIGHLIGHT, HIGHLIGHT_SKILLS):
         row = params[params["skill"] == skill]
         if row.empty:
             continue
-        ax2.scatter(row["learn"], row["forget"], s=42, color=color, edgecolor=SURFACE, linewidths=1.5)
-        ax2.annotate(skill, (row["learn"].iloc[0], row["forget"].iloc[0]), xytext=(5, 3),
-                     textcoords="offset points", fontsize=7.5, color=INK_SECONDARY)
-    style_axes(ax2)
-    ax2.set_xscale("log")
-    ax2.set_yscale("log")
+        x, y = float(row["learn"].iloc[0]), float(row["forget"].iloc[0])
+        ax2.scatter([x], [y], s=42, color=color, edgecolor=SURFACE, linewidths=1.5, zorder=4)
+        px, py = ax2.transData.transform((x, y))
+        level = sum(1 for qx, qy in placed if abs(px - qx) < 10 and abs(py - qy) < 10)
+        placed.append((px, py))
+        ax2.annotate(skill, (x, y), xytext=(7, 4 + 12 * level), textcoords="offset points",
+                     fontsize=7.5, color=color, annotation_clip=False)
     ax2.set_xlabel("learn rate per checkpoint", fontsize=8, color=INK_SECONDARY)
     ax2.set_ylabel("forget rate per checkpoint", fontsize=8, color=INK_SECONDARY)
     ax2.set_title("Learn vs forget, one point per subject", fontsize=9, color=INK, loc="left")
 
     fig.suptitle(f"BKT on OLMo-2 MMLU ({title_setting})", fontsize=11, color=INK, x=0.01, ha="left")
-    fig.text(0.01, 0.91, "Fitted once on all 94 checkpoints; per-item guess and slip shrunk toward "
-             "the subject's values.", fontsize=8, color=INK_SECONDARY)
+    pinned = "per-skill limit" in title_setting
+    fig.text(0.01, 0.91, "Fitted once on all 94 checkpoints; "
+             + ("one guess/slip pair per subject, every question pinned to it (classic BKT)."
+                if pinned else "per-item guess and slip shrunk toward the subject's values."),
+             fontsize=8, color=INK_SECONDARY)
     fig.subplots_adjust(left=0.06, right=0.985, top=0.80, bottom=0.14, wspace=0.6)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=150, facecolor=SURFACE)
     plt.close(fig)
+
+
+RHO_COLORS = {1.0: HIGHLIGHT[0], 0.9: HIGHLIGHT[1], 0.7: HIGHLIGHT[2]}
+
+
+def _bkt_rows(val: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for name, ll in zip(val["predictor"], val["log_loss"]):
+        if NAME_RE.match(name):
+            kappa, rho, anchor = parse_name(name)
+            rows.append({"predictor": name, "kappa": kappa, "rho": rho, "anchor": anchor,
+                         "thetas": name.split(anchor, 1)[1], "log_loss": ll})
+    return pd.DataFrame(rows)
+
+
+def plot_validation_grid(val: pd.DataFrame, best_skill: str, best_fluid: str | None, out: Path) -> None:
+    """Validation log-loss against kappa, one line per rho; skill anchor solid, Fluid anchor dashed.
+
+    Only the Fluid theta pair of `best_fluid` is drawn. Item mean, the recency control and the
+    per-skill limit are horizontal references. The two selected settings are ringed.
+    """
+    rows = _bkt_rows(val)
+    fig, ax = plt.subplots(figsize=(8.5, 4.4))
+    fig.patch.set_facecolor(SURFACE)
+    finite = rows[rows["kappa"] < KAPPA_LIMIT]
+    fluid_thetas = best_fluid.split("fluid", 1)[1] if best_fluid else None
+    for anchor, ls, label in (("skill", "-", "skill anchor"), ("fluid", "--", "Fluid anchor")):
+        sub = finite[finite["anchor"] == anchor]
+        if anchor == "fluid":
+            sub = sub[sub["thetas"] == fluid_thetas] if fluid_thetas else sub.iloc[0:0]
+        for rho in sorted(sub["rho"].unique(), reverse=True):
+            g = sub[sub["rho"] == rho].sort_values("kappa")
+            ax.plot(g["kappa"], g["log_loss"], ls, color=RHO_COLORS.get(rho, MUTED), lw=2.0,
+                    marker="o", ms=4.5, label=f"{label}, rho {rho:g}")
+    refs = []
+    for name, text in ((ITEM_MEAN, "item mean (the bar)"),
+                       (next((n for n in val["predictor"] if n.startswith("item_mean_ewma")), None),
+                        "recency-weighted item mean"),
+                       (LIMIT, "per-skill limit (kappa = 1e6)")):
+        if name is not None and name in set(val["predictor"]):
+            y = float(val.loc[val["predictor"] == name, "log_loss"].iloc[0])
+            refs.append((y, text))
+    for (y, text), ls in zip(refs, (":", "-.", (0, (6, 2, 1, 2, 1, 2)))):
+        ax.axhline(y, color=INK_SECONDARY, lw=1.0, ls=ls, label=text)
+    for name in (best_skill, best_fluid):
+        if name is None:
+            continue
+        kappa, _, _ = parse_name(name)
+        y = float(val.loc[val["predictor"] == name, "log_loss"].iloc[0])
+        ax.scatter([kappa], [y], s=110, facecolor="none", edgecolor=INK, linewidths=1.4, zorder=5,
+                   label="selected on validation" if name == best_skill else None)
+    style_axes(ax)
+    ax.set_xscale("log")
+    ax.set_xlabel("kappa (pseudo-count pulling each question toward its anchor; log scale)",
+                  fontsize=8, color=INK_SECONDARY)
+    ax.set_ylabel("validation log-loss (lower is better)", fontsize=8, color=INK_SECONDARY)
+    ax.set_title("BKT grid on OLMo-2 MMLU, validation block (checkpoints 56 to 74), horizon 1",
+                 fontsize=9, color=INK, loc="left")
+    ax.legend(fontsize=7.5, frameon=False, loc="upper left", bbox_to_anchor=(1.01, 1.0), borderaxespad=0.0)
+    thetas_text = "none"
+    if fluid_thetas:
+        m = re.match(r"_lo(-?[\d.]+)_hi(-?[\d.]+)", fluid_thetas)
+        thetas_text = f"theta_lo {m.group(1)}, theta_hi {m.group(2)}" if m else fluid_thetas
+    fig.text(0.01, 0.93, f"Fluid anchor shown for its best theta pair ({thetas_text}); "
+             "recency (rho below 1) helps at every kappa, and the curve is flat below kappa 1.",
+             fontsize=8, color=INK_SECONDARY)
+    fig.subplots_adjust(left=0.08, right=0.70, top=0.84, bottom=0.14)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
+def plot_horizons(scores: pd.DataFrame, best_skill: str, best_fluid: str | None, control: str,
+                  out: Path) -> None:
+    """Test-block log-loss and AUC against horizon for item mean, the control and the two BKTs.
+
+    `scores` has one row per (h, scope, predictor) with log_loss, log_loss_se, auc, auc_se.
+    """
+    series = [(ITEM_MEAN, "item mean (the bar)", MUTED),
+              (control, "recency-weighted item mean", HIGHLIGHT[0]),
+              (best_skill, "BKT, skill anchor", HIGHLIGHT[1])]
+    if best_fluid:
+        series.append((best_fluid, "BKT, Fluid anchor", HIGHLIGHT[2]))
+    test = scores[scores["scope"] == "test"].drop_duplicates(["h", "predictor"])
+    hs = sorted(test["h"].unique())
+    xpos = {h: i for i, h in enumerate(hs)}
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4.0))
+    fig.patch.set_facecolor(SURFACE)
+    for ax, metric, ylabel in zip(axes, ("log_loss", "auc"),
+                                  ("test-block log-loss (lower is better)", "test-block AUC (higher is better)")):
+        for k, (name, label, color) in enumerate(series):
+            g = test[test["predictor"] == name].sort_values("h")
+            if g.empty:
+                continue
+            x = [xpos[h] + (k - 1.5) * 0.04 for h in g["h"]]  # small dodge so error bars stay visible
+            ax.errorbar(x, g[metric], yerr=g.get(f"{metric}_se"), color=color, lw=2.0, marker="o", ms=5,
+                        capsize=2.5, label=label)
+        style_axes(ax)
+        ax.set_xticks(list(xpos.values()))
+        ax.set_xticklabels([str(h) for h in hs])
+        ax.set_xlim(-0.4, len(hs) - 0.6)
+        ax.set_xlabel("horizon (checkpoints ahead)", fontsize=8, color=INK_SECONDARY)
+        ax.set_ylabel(ylabel, fontsize=8, color=INK_SECONDARY)
+    axes[0].set_title("Log-loss", fontsize=9, color=INK, loc="left")
+    axes[1].set_title("AUC", fontsize=9, color=INK, loc="left")
+    axes[1].legend(fontsize=7.5, frameon=False, loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0.0)
+    fig.suptitle("BKT against the bar further ahead, OLMo-2 MMLU test block (checkpoints 75 to 93)",
+                 fontsize=10, color=INK, x=0.01, ha="left")
+    fig.text(0.01, 0.90, "Error bars: bootstrap standard error over the 57 subjects. Settings chosen at horizon 1.",
+             fontsize=8, color=INK_SECONDARY)
+    fig.subplots_adjust(left=0.07, right=0.80, top=0.80, bottom=0.14, wspace=0.35)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
+def _selected_setting_text(params: pd.DataFrame) -> str:
+    """Title text for the selected setting, read from the stored params when available."""
+    if {"kappa", "rho"} <= set(params.columns):
+        return f"selected: kappa={params['kappa'].iloc[0]:g}, rho={params['rho'].iloc[0]:g}"
+    return "selected setting"
+
+
+def replot_mastery(out_dir: Path, fig_dir: Path = FIG_DIR) -> list[Path]:
+    """Redraw the mastery figures from the stored CSVs (no refit). Returns the files written."""
+    written = []
+    for suffix, setting in (("", None), (f"_k{KAPPA_LIMIT * 10:g}_r1", "per-skill limit: kappa=1e6, rho=1")):
+        m_path = out_dir / f"bkt_mastery_{FOCUS_MODEL}{suffix}.csv"
+        p_path = out_dir / f"bkt_skill_params_{FOCUS_MODEL}{suffix}.csv"
+        if not (m_path.exists() and p_path.exists()):
+            print(f"(no {m_path.name}; run with --mastery first)")
+            continue
+        mastery, params = pd.read_csv(m_path), pd.read_csv(p_path)
+        if setting is None:
+            setting = _selected_setting_text(params)
+        out = fig_dir / f"bkt_mastery_{FOCUS_MODEL}{suffix}.png"
+        plot_mastery(mastery, params, out, setting)
+        written.append(out)
+    return written
 
 
 def fit_mastery(kappa: float, rho: float) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -274,7 +429,10 @@ def main() -> None:
     parser.add_argument("--horizon-tag", default="bkt_best")
     parser.add_argument("--ewma-tag", default="bkt_ewma",
                         help="tag of the item_mean_ewma runs used as the recency control")
-    parser.add_argument("--mastery", action="store_true", help="fit the selected setting on the full history and plot")
+    parser.add_argument("--mastery", action="store_true",
+                        help="fit the selected setting and the per-skill limit on the full history and plot")
+    parser.add_argument("--replot-mastery", action="store_true",
+                        help="redraw the mastery figures from the stored CSVs without refitting")
     parser.add_argument("--kappa", type=float, default=None, help="override kappa for the mastery fit")
     parser.add_argument("--rho", type=float, default=None, help="override rho for the mastery fit")
     parser.add_argument("--out-dir", type=Path, default=RESULTS_DIR,
@@ -354,19 +512,39 @@ def main() -> None:
         pd.concat(extra_scores, ignore_index=True).to_csv(out_dir / "extra_scores.csv", index=False)
         pd.concat(extra_diffs, ignore_index=True).to_csv(out_dir / "extra_paired_differences.csv", index=False)
 
+    grid_fig = FIG_DIR / "bkt_validation_grid.png"
+    plot_validation_grid(val, best_skill, best_fluid, grid_fig)
+    print(f"\nWrote {grid_fig}")
+    all_scores = pd.concat([t.assign(h=h) for h in (1, 5, 20) for t in scores[h]], ignore_index=True)
+    if set(all_scores["h"]) > {1}:
+        hz_fig = FIG_DIR / "bkt_horizons.png"
+        plot_horizons(all_scores, best_skill, best_fluid, control, hz_fig)
+        print(f"Wrote {hz_fig}")
+
+    if args.replot_mastery and not args.mastery:
+        for out in replot_mastery(out_dir):
+            print(f"Redrew {out}")
     if args.mastery:
         kappa, rho, _ = parse_name(best_skill)
-        kappa = args.kappa if args.kappa is not None else kappa
-        rho = args.rho if args.rho is not None else rho
-        # an overridden setting gets its own file names so the selected setting's files stay
-        suffix = "" if (args.kappa is None and args.rho is None) else f"_k{kappa:g}_r{rho:g}"
-        mastery, params = fit_mastery(kappa, rho)
-        mastery.to_csv(out_dir / f"bkt_mastery_{FOCUS_MODEL}{suffix}.csv", index=False)
-        params.to_csv(out_dir / f"bkt_skill_params_{FOCUS_MODEL}{suffix}.csv", index=False)
-        out = FIG_DIR / f"bkt_mastery_{FOCUS_MODEL}{suffix}.png"
-        plot_mastery(mastery, params, out, f"kappa={kappa:g}, rho={rho:g}")
-        print(f"\nWrote {out} and the mastery / skill-parameter CSVs under {out_dir}")
-        print(params.sort_values("learn", ascending=False).round(4).to_string(index=False))
+        if args.kappa is not None or args.rho is not None:
+            # an overridden setting gets its own file names so the selected setting's files stay
+            k = args.kappa if args.kappa is not None else kappa
+            r = args.rho if args.rho is not None else rho
+            fits = [(k, r, f"_k{k:g}_r{r:g}", "override")]
+        else:
+            fits = [(kappa, rho, "", "selected setting"),
+                    (KAPPA_LIMIT * 10, 1.0, f"_k{KAPPA_LIMIT * 10:g}_r1", "per-skill limit")]
+        for k, r, suffix, what in fits:
+            mastery, params = fit_mastery(k, r)
+            params.insert(1, "kappa", k)
+            params.insert(2, "rho", r)
+            mastery.to_csv(out_dir / f"bkt_mastery_{FOCUS_MODEL}{suffix}.csv", index=False)
+            params.to_csv(out_dir / f"bkt_skill_params_{FOCUS_MODEL}{suffix}.csv", index=False)
+            out = FIG_DIR / f"bkt_mastery_{FOCUS_MODEL}{suffix}.png"
+            title = f"{what}: kappa={k:g}, rho={r:g}" if what != "per-skill limit" else "per-skill limit: kappa=1e6, rho=1"
+            plot_mastery(mastery, params, out, title)
+            print(f"\nWrote {out} ({what}) and the mastery / skill-parameter CSVs under {out_dir}")
+            print(params.sort_values("learn", ascending=False).round(4).to_string(index=False))
 
 
 if __name__ == "__main__":
