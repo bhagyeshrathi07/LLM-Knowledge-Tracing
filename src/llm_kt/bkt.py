@@ -38,12 +38,16 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 import numpy as np
+import pandas as pd
 from scipy.special import logsumexp
+
+from llm_kt.static_irt import prob_logistic
 
 EPS = 1e-6
 MIN_GAP = 0.05  # the learned state must be the better one: guess <= 1 - slip - MIN_GAP
 ANCHORS = ("skill", "fluid")
 COLD_START = {"pi": 0.2, "learn": 0.1, "forget": 0.02, "guess_s": 0.25, "slip_s": 0.3}
+KAPPA_LIMIT = 1e5  # kappa at or above this pins every item exactly to its anchor (per-skill BKT)
 
 
 def _clip_unit(x: np.ndarray | float) -> np.ndarray | float:
@@ -138,6 +142,7 @@ class SkillParams:
     slip: np.ndarray  # per item
     n_iter: int = 0
     loglik: float = float("nan")
+    filtered: np.ndarray | None = None  # P(z_t = 1 | y_{0..t}) per checkpoint, final params
 
 
 def _rate(num: float, den: float, prior_mean: float, prior_count: float) -> float:
@@ -171,16 +176,24 @@ def fit_skill(
     n_obs = max(int(M.sum()), 1)
     w = rho ** np.arange(T - 1, -1, -1, dtype=float)  # (T,) recency weights, 1 at the origin
     fluid = anchor_guess is not None
-    if fluid:
-        a_guess = np.asarray(anchor_guess, dtype=float)
-        a_slip = _clip_unit(np.asarray(anchor_slip, dtype=float))
-        a_guess = np.asarray(clip_guess(a_guess, a_slip))
+    if fluid:  # NaN entries mean "no Fluid parameters for this item": use the skill anchor there
+        a_guess_raw = np.asarray(anchor_guess, dtype=float)
+        a_slip_raw = np.asarray(anchor_slip, dtype=float)
+
+    def anchors(guess_s: float, slip_s: float) -> tuple[np.ndarray | float, np.ndarray | float]:
+        if not fluid:
+            return guess_s, slip_s
+        s0 = _clip_unit(np.where(np.isnan(a_slip_raw), slip_s, a_slip_raw))
+        g0 = clip_guess(np.where(np.isnan(a_guess_raw), guess_s, a_guess_raw), s0)
+        return g0, s0
+
+    pinned = kappa >= KAPPA_LIMIT
     m0 = COLD_START
     if init is None:
         pi, learn, forget, guess_s, slip_s = (
             m0["pi"], m0["learn"], m0["forget"], m0["guess_s"], m0["slip_s"])
-        guess = a_guess.copy() if fluid else np.full(N, guess_s)
-        slip = a_slip.copy() if fluid else np.full(N, slip_s)
+        g0, s0 = anchors(guess_s, slip_s)
+        guess, slip = np.broadcast_to(g0, N).copy(), np.broadcast_to(s0, N).copy()
     else:
         pi, learn, forget, guess_s, slip_s = (
             init.pi, init.learn, init.forget, init.guess_s, init.slip_s)
@@ -206,15 +219,193 @@ def fit_skill(
         slip_s = _rate((obs1 * (1.0 - Yz)).sum(), obs1.sum(), m0["slip_s"], prior_count)
         guess_s = clip_guess(guess_s, slip_s)
         # item-level M-step, recency weighted, shrunk toward the anchor
-        g0_i = a_guess if fluid else guess_s
-        s0_i = a_slip if fluid else slip_s
-        w0 = obs0 * w[None, :]
-        w1 = obs1 * w[None, :]
-        guess = ((w0 * Yz).sum(axis=1) + kappa * g0_i) / (w0.sum(axis=1) + kappa)
-        slip = ((w1 * (1.0 - Yz)).sum(axis=1) + kappa * s0_i) / (w1.sum(axis=1) + kappa)
-        slip = _clip_unit(slip)
-        guess = clip_guess(guess, slip)
+        g0_i, s0_i = anchors(guess_s, slip_s)
+        if pinned:
+            guess, slip = np.broadcast_to(g0_i, N).copy(), np.broadcast_to(s0_i, N).copy()
+        else:
+            w0 = obs0 * w[None, :]
+            w1 = obs1 * w[None, :]
+            guess = ((w0 * Yz).sum(axis=1) + kappa * g0_i) / (w0.sum(axis=1) + kappa)
+            slip = ((w1 * (1.0 - Yz)).sum(axis=1) + kappa * s0_i) / (w1.sum(axis=1) + kappa)
+            slip = _clip_unit(slip)
+            guess = clip_guess(guess, slip)
         if abs(loglik - prev) / n_obs < tol:
             break
         prev = loglik
-    return SkillParams(pi, learn, forget, guess_s, slip_s, guess, slip, n_iter, loglik)
+    # filtered state under the final parameters, for forecasting and the mastery curve
+    log_pi = np.log([1.0 - pi, pi])
+    log_A = np.log([[1.0 - learn, learn], [forget, 1.0 - forget]])
+    fb = log_forward_backward(log_pi, log_A, batch_log_emissions(Y, guess, slip))
+    return SkillParams(pi, learn, forget, guess_s, slip_s, guess, slip, n_iter, loglik,
+                       filtered=fb.filtered[:, 1])
+
+
+def _ids(col: pd.Series) -> np.ndarray:
+    """String keys as an object array, so Index.get_indexer uses a hash table."""
+    return col.to_numpy(dtype=object)
+
+
+class BKT:
+    """Predictor: per-skill two-state BKT with per-item guess and slip, refit at every origin."""
+
+    def __init__(
+        self,
+        kappa: float = 5.0,
+        rho: float = 1.0,
+        anchor: str = "skill",
+        item_params: pd.DataFrame | None = None,
+        theta_lo: float = -1.0,
+        theta_hi: float = 1.0,
+        max_iter: int = 50,
+        tol: float = 1e-5,
+        prior_count: float = 1.0,
+    ):
+        if anchor not in ANCHORS:
+            raise ValueError(f"anchor must be one of {ANCHORS}, got {anchor!r}")
+        if kappa <= 0:
+            raise ValueError(f"kappa must be > 0, got {kappa}")
+        if not 0 < rho <= 1:
+            raise ValueError(f"rho must be in (0, 1], got {rho}")
+        if anchor == "fluid":
+            if item_params is None:
+                raise ValueError("anchor='fluid' needs item_params (item_id, a, b)")
+            if not theta_lo < theta_hi:
+                raise ValueError(f"need theta_lo < theta_hi, got {theta_lo}, {theta_hi}")
+        self.kappa = kappa
+        self.rho = rho
+        self.anchor = anchor
+        self.theta_lo = theta_lo
+        self.theta_hi = theta_hi
+        self.max_iter = max_iter
+        self.tol = tol
+        self.prior_count = prior_count
+        self.anchors: pd.DataFrame | None = None
+        if anchor == "fluid":
+            ip = item_params.drop_duplicates("item_id")
+            a = ip["a"].to_numpy(dtype=float)
+            b = ip["b"].to_numpy(dtype=float)
+            slip0 = 1.0 - prob_logistic(theta_hi, a, b)
+            guess0 = prob_logistic(theta_lo, a, b)
+            self.anchors = pd.DataFrame(
+                {"guess0": guess0, "slip0": slip0}, index=pd.Index(_ids(ip["item_id"]))
+            )
+        self.name = f"bkt_k{kappa:g}_r{rho:g}_{anchor}" + (
+            f"_lo{theta_lo:g}_hi{theta_hi:g}" if anchor == "fluid" else ""
+        )
+        self._reset()
+
+    # -- state ---------------------------------------------------------------------------
+
+    def _reset(self) -> None:
+        self._key = None  # (model, last checkpoint, n rows, sum correct, weighted sum)
+        self._state: dict[str, dict] = {}  # skill -> params, items (Index), ckpts
+        self._global_last = float("nan")
+
+    @staticmethod
+    def _fingerprint(history: pd.DataFrame, upto: int) -> tuple:
+        h = history[history["checkpoint_idx"] <= upto]
+        y = h["correct"].to_numpy(dtype=float)
+        model = history["model"].iloc[0] if "model" in history.columns and len(history) else None
+        return (model, upto, len(h), float(y.sum()), float((y * h["checkpoint_idx"].to_numpy()).sum()))
+
+    def _anchor_arrays(self, item_ids: np.ndarray) -> tuple[np.ndarray | None, np.ndarray | None]:
+        """Fluid anchor values per item (NaN where the item has no parameters); None for skill anchor."""
+        if self.anchors is None:
+            return None, None
+        pos = self.anchors.index.get_indexer(item_ids)
+        g = np.full(len(item_ids), np.nan)
+        s = np.full(len(item_ids), np.nan)
+        hit = pos >= 0
+        g[hit] = self.anchors["guess0"].to_numpy()[pos[hit]]
+        s[hit] = self.anchors["slip0"].to_numpy()[pos[hit]]
+        return g, s
+
+    def fit(self, history: pd.DataFrame) -> None:
+        """Fit every skill on `history`, warm-starting from the cache when it extends the cached run."""
+        last = int(history["checkpoint_idx"].max())
+        warm = False
+        if self._key is not None:
+            cached_last = self._key[1]
+            if last >= cached_last and self._fingerprint(history, cached_last) == self._key:
+                warm = True
+            else:
+                self._reset()
+        wide = history.pivot(index="item_id", columns="checkpoint_idx", values="correct")
+        wide.index = pd.Index(_ids(wide.index.to_series()))
+        ckpts = wide.columns.to_numpy(dtype=int)
+        item_skill = history.drop_duplicates("item_id").set_index("item_id")["skill"]
+        new_state: dict[str, dict] = {}
+        for skill, ids in item_skill.groupby(item_skill, sort=True).groups.items():
+            items = pd.Index(np.sort(np.asarray(list(ids), dtype=object)))
+            Y = wide.loc[items].to_numpy(dtype=float)
+            a_g, a_s = self._anchor_arrays(items.to_numpy(dtype=object))
+            init = None
+            if warm and skill in self._state:
+                old = self._state[skill]
+                op = old["params"]
+                pos = old["items"].get_indexer(items)
+                hit = pos >= 0
+                g0, s0 = (a_g, a_s) if a_g is not None else (op.guess_s, op.slip_s)
+                guess = np.where(hit, op.guess[np.where(hit, pos, 0)], np.broadcast_to(g0, len(items)))
+                slip = np.where(hit, op.slip[np.where(hit, pos, 0)], np.broadcast_to(s0, len(items)))
+                guess = np.where(np.isnan(guess), op.guess_s, guess)
+                slip = np.where(np.isnan(slip), op.slip_s, slip)
+                init = SkillParams(op.pi, op.learn, op.forget, op.guess_s, op.slip_s, guess, slip)
+            params = fit_skill(
+                Y, self.kappa, self.rho, a_g, a_s, init=init,
+                max_iter=self.max_iter, tol=self.tol, prior_count=self.prior_count,
+            )
+            new_state[skill] = {"params": params, "items": items, "ckpts": ckpts}
+        self._state = new_state
+        self._global_last = float(history.loc[history["checkpoint_idx"] == last, "correct"].mean())
+        self._key = self._fingerprint(history, last)
+
+    # -- predicting ----------------------------------------------------------------------
+
+    def predict(self, history: pd.DataFrame, target: pd.DataFrame, horizon: int = 1) -> np.ndarray:
+        self.fit(history)
+        p = np.full(len(target), self._global_last)
+        items_all = _ids(target["item_id"])
+        for skill, idx in target.groupby("skill").indices.items():
+            st = self._state.get(skill)
+            if st is None:
+                continue  # skill never observed: last-checkpoint global accuracy
+            sp = st["params"]
+            z = forecast_state(sp.filtered[-1], sp.learn, sp.forget, horizon)
+            items = items_all[idx]
+            pos = st["items"].get_indexer(items)
+            hit = pos >= 0
+            a_g, a_s = self._anchor_arrays(items)
+            if a_g is None:
+                g0, s0 = np.full(len(items), sp.guess_s), np.full(len(items), sp.slip_s)
+            else:
+                s0 = _clip_unit(np.where(np.isnan(a_s), sp.slip_s, a_s))
+                g0 = clip_guess(np.where(np.isnan(a_g), sp.guess_s, a_g), s0)
+            guess = np.where(hit, sp.guess[np.where(hit, pos, 0)], g0)
+            slip = np.where(hit, sp.slip[np.where(hit, pos, 0)], s0)
+            p[idx] = z * (1.0 - slip) + (1.0 - z) * guess
+        return np.clip(p, EPS, 1.0 - EPS)
+
+    # -- interpretable output -------------------------------------------------------------
+
+    def mastery(self) -> pd.DataFrame:
+        """Filtered P(learned) per (skill, checkpoint) for the last fitted history."""
+        frames = [
+            pd.DataFrame({"skill": skill, "checkpoint_idx": st["ckpts"],
+                          "p_learned": st["params"].filtered})
+            for skill, st in self._state.items()
+        ]
+        if not frames:
+            return pd.DataFrame(columns=["skill", "checkpoint_idx", "p_learned"])
+        return pd.concat(frames, ignore_index=True)
+
+    def skill_params(self) -> pd.DataFrame:
+        """One row per skill: n_items, pi, learn, forget, guess_s, slip_s, n_iter."""
+        rows = [
+            {"skill": skill, "n_items": len(st["items"]), "pi": sp.pi, "learn": sp.learn,
+             "forget": sp.forget, "guess_s": sp.guess_s, "slip_s": sp.slip_s, "n_iter": sp.n_iter}
+            for skill, st in self._state.items()
+            for sp in (st["params"],)
+        ]
+        cols = ["skill", "n_items", "pi", "learn", "forget", "guess_s", "slip_s", "n_iter"]
+        return pd.DataFrame(rows, columns=cols)

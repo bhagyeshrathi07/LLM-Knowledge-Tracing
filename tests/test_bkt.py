@@ -1,10 +1,15 @@
 import numpy as np
+import pandas as pd
 import pytest
 from scipy.special import logsumexp
 
+from llm_kt.baselines import ItemMean
 from llm_kt.bkt import (
+    ANCHORS,
+    BKT,
     COLD_START,
     EPS,
+    MIN_GAP,
     SkillParams,
     batch_log_emissions,
     clip_guess,
@@ -12,6 +17,8 @@ from llm_kt.bkt import (
     forecast_state,
     log_forward_backward,
 )
+from llm_kt.evaluate import TARGET_COLUMNS, evaluate
+from llm_kt.static_irt import prob_logistic
 
 
 def brute_force(log_pi, log_A, log_emit):
@@ -143,3 +150,190 @@ class TestFitSkill:
         warm = fit_skill(Y, kappa=5.0, rho=1.0, init=cold)
         assert warm.n_iter < cold.n_iter
         assert warm.learn == pytest.approx(cold.learn, abs=1e-3)
+
+
+def rows_from_matrix(Y: np.ndarray, item_ids: list[str], skills: list[str], model: str = "m") -> pd.DataFrame:
+    """Long-format history from an items x checkpoints 0/1 matrix."""
+    n_items, T = Y.shape
+    return pd.DataFrame(
+        {
+            "model": model,
+            "checkpoint_idx": np.repeat(np.arange(T), n_items),
+            "checkpoint_label": [f"step{t}" for t in np.repeat(np.arange(T), n_items)],
+            "step": np.repeat(np.arange(T), n_items),
+            "tokens_seen_b": pd.NA,
+            "benchmark": "mmlu",
+            "skill": np.tile(skills, T),
+            "item_id": np.tile(item_ids, T),
+            "correct": Y.T.ravel().astype(int),
+        }
+    )
+
+
+def target_at(history: pd.DataFrame, idx: int) -> pd.DataFrame:
+    last = history[history["checkpoint_idx"] == history["checkpoint_idx"].max()]
+    return last[TARGET_COLUMNS].assign(checkpoint_idx=idx, step=idx).reset_index(drop=True)
+
+
+def _state_forecast(m: BKT, skill: str, h: int = 1) -> float:
+    sp = m.skill_params().set_index("skill").loc[skill]
+    p_last = m.mastery().query("skill == @skill")["p_learned"].iloc[-1]
+    return forecast_state(p_last, sp["learn"], sp["forget"], h)
+
+
+@pytest.fixture
+def world():
+    """Two skills, 200 items, 15 checkpoints; skill s0 learned early, s1 late."""
+    rng = np.random.default_rng(0)
+    N, T = 200, 15
+    ids = [f"mmlu_{i}" for i in range(N)]
+    skills = ["s0" if i < 100 else "s1" for i in range(N)]
+    guess, slip = rng.uniform(0.1, 0.4, N), rng.uniform(0.1, 0.4, N)
+    z0 = (np.arange(T) >= 3).astype(int)
+    z1 = (np.arange(T) >= 10).astype(int)
+    z = np.where(np.array(skills)[:, None] == "s0", z0[None, :], z1[None, :])
+    Y = (rng.random((N, T)) < np.where(z == 1, 1 - slip[:, None], guess[:, None])).astype(float)
+    params = pd.DataFrame({"item_id": ids, "a": rng.uniform(0.5, 2.0, N), "b": rng.normal(0, 1, N)})
+    return params, rows_from_matrix(Y, ids, skills), ids, skills
+
+
+class TestPredictor:
+    def test_shape_alignment_and_range(self, world):
+        _, hist, _, _ = world
+        target = target_at(hist, 15)
+        p = BKT(kappa=5.0).predict(hist, target, horizon=1)
+        assert p.shape == (len(target),) and np.all(np.isfinite(p)) and ((p > 0) & (p < 1)).all()
+        perm = np.random.default_rng(3).permutation(len(target))
+        shuffled = target.iloc[perm].reset_index(drop=True)
+        assert BKT(kappa=5.0).predict(hist, shuffled) == pytest.approx(p[perm])
+
+    def test_per_skill_limit_is_constant_within_skill(self, world):
+        _, hist, _, skills = world
+        p = BKT(kappa=1e6).predict(hist, target_at(hist, 15))
+        for s in ("s0", "s1"):
+            assert np.ptp(p[np.array(skills) == s]) < 1e-6
+
+    def test_per_item_ranks_right_above_wrong(self):
+        T = 10
+        ids = ["mmlu_right", "mmlu_wrong"] + [f"mmlu_x{i}" for i in range(40)]
+        rng = np.random.default_rng(4)
+        Y = np.vstack([np.ones(T), np.zeros(T), (rng.random((40, T)) < 0.5).astype(float)])
+        hist = rows_from_matrix(Y, ids, ["s"] * len(ids))
+        p = pd.Series(BKT(kappa=1.0).predict(hist, target_at(hist, T)), index=ids)
+        assert p["mmlu_right"] > 0.6 and p["mmlu_wrong"] < 0.4
+
+    def test_rho_tracks_recent_flip(self):
+        T = 20
+        ids = ["mmlu_flip"] + [f"mmlu_x{i}" for i in range(60)]
+        rng = np.random.default_rng(5)
+        flip = np.r_[np.zeros(T - 3), np.ones(3)]
+        Y = np.vstack([flip, (rng.random((60, T)) < 0.5).astype(float)])
+        hist = rows_from_matrix(Y, ids, ["s"] * len(ids))
+        target = target_at(hist, T)
+        p = {
+            r: pd.Series(BKT(kappa=1.0, rho=r).predict(hist, target), index=ids)["mmlu_flip"]
+            for r in (1.0, 0.7)
+        }
+        assert p[0.7] > p[1.0] + 0.2 and p[1.0] < 0.4
+
+    def test_longer_horizon_moves_toward_stationary(self, world):
+        _, hist, _, _ = world
+        m = BKT(kappa=5.0)
+        target = target_at(hist, 15)
+        p1 = m.predict(hist, target, horizon=1)
+        p20 = m.predict(hist, target, horizon=20)
+        sp = m.skill_params().set_index("skill")
+        state1 = m.mastery().groupby("skill")["p_learned"].last()
+        assert set(sp.index) == {"s0", "s1"} and (state1 > 0.5).all()  # both learned by t=14
+        assert np.all(np.isfinite(p20)) and np.mean(np.abs(p20 - p1)) > 0  # horizon matters
+        for s in ("s0", "s1"):
+            st = sp.loc[s, "learn"] / (sp.loc[s, "learn"] + sp.loc[s, "forget"])
+            assert abs(_state_forecast(m, s, 20) - st) <= abs(_state_forecast(m, s, 1) - st)
+
+    def test_fluid_anchor_unseen_item_uses_2pl_anchor(self, world):
+        params, hist, ids, _ = world
+        m = BKT(kappa=1e6, anchor="fluid", item_params=params, theta_lo=-1.0, theta_hi=1.0)
+        target = target_at(hist, 15)
+        p = m.predict(hist[hist["item_id"] != ids[0]], target)[0]
+        a, b = params["a"].iloc[0], params["b"].iloc[0]
+        g, hi = prob_logistic(-1.0, a, b), prob_logistic(1.0, a, b)
+        g = min(g, hi - MIN_GAP)
+        z = _state_forecast(m, "s0", 1)
+        assert p == pytest.approx(z * hi + (1 - z) * g, abs=1e-6)
+
+    def test_fluid_anchor_item_without_params_uses_skill_anchor(self, world):
+        params, hist, _, _ = world
+        m = BKT(kappa=1e6, anchor="fluid", item_params=params.iloc[1:])
+        p = m.predict(hist, target_at(hist, 15))
+        sp = m.skill_params().set_index("skill").loc["s0"]
+        z = _state_forecast(m, "s0", 1)
+        assert p[0] == pytest.approx(z * (1 - sp["slip_s"]) + (1 - z) * sp["guess_s"], abs=1e-6)
+
+    def test_unseen_skill_falls_back_to_global_mean(self, world):
+        _, hist, _, _ = world
+        target = target_at(hist, 15).copy()
+        target.loc[0, "skill"] = "never_seen"
+        target.loc[0, "item_id"] = "mmlu_new"
+        p = BKT().predict(hist, target)
+        last = hist[hist["checkpoint_idx"] == 14]
+        assert p[0] == pytest.approx(last["correct"].mean())
+
+    def test_two_checkpoint_history_is_finite(self, world):
+        _, hist, _, _ = world
+        short = hist[hist["checkpoint_idx"] <= 1]
+        p = BKT(kappa=5.0, rho=0.7).predict(short, target_at(short, 2))
+        assert np.all(np.isfinite(p)) and ((p > 0) & (p < 1)).all()
+
+    def test_missing_cells_are_ignored(self, world):
+        _, hist, ids, _ = world
+        hole = (hist["item_id"] == ids[0]) & (hist["checkpoint_idx"].isin([5, 6, 7]))
+        holed = hist[~hole]
+        p = BKT(kappa=5.0).predict(holed, target_at(hist, 15))
+        assert np.all(np.isfinite(p))
+        full = BKT(kappa=5.0).predict(hist, target_at(hist, 15))
+        assert abs(p[0] - full[0]) < 0.2 and p[1:] == pytest.approx(full[1:], abs=0.05)
+
+    def test_cache_warm_start_close_to_cold_and_resets(self, world):
+        _, hist, _, _ = world
+        target = target_at(hist, 15)
+        m = BKT(kappa=5.0)
+        for t in (4, 9):
+            m.predict(hist[hist["checkpoint_idx"] <= t], target)
+        assert m.predict(hist, target) == pytest.approx(BKT(kappa=5.0).predict(hist, target), abs=0.02)
+        other = hist.assign(correct=1 - hist["correct"])
+        assert m.predict(other, target) == pytest.approx(BKT(kappa=5.0).predict(other, target))
+        short = hist[hist["checkpoint_idx"] <= 4]
+        assert m.predict(short, target) == pytest.approx(BKT(kappa=5.0).predict(short, target))
+
+    def test_mastery_and_skill_params_shapes(self, world):
+        _, hist, _, _ = world
+        m = BKT(kappa=5.0)
+        m.fit(hist)
+        ms = m.mastery()
+        assert list(ms.columns) == ["skill", "checkpoint_idx", "p_learned"] and len(ms) == 2 * 15
+        assert ms["p_learned"].between(0, 1).all()
+        sp = m.skill_params()
+        assert list(sp.columns) == [
+            "skill", "n_items", "pi", "learn", "forget", "guess_s", "slip_s", "n_iter"
+        ]
+        assert sp["n_items"].tolist() == [100, 100]
+
+    def test_runs_in_harness(self, world):
+        _, hist, _, _ = world
+        res = evaluate(hist, [BKT(kappa=5.0), ItemMean()], horizon=2)
+        assert set(res["predictor"]) == {"bkt_k5_r1_skill", "item_mean"}
+        assert res["log_loss"].notna().all()
+
+    def test_name_and_validation(self):
+        params = pd.DataFrame({"item_id": ["x"], "a": [1.0], "b": [0.0]})
+        assert BKT(kappa=20, rho=0.9).name == "bkt_k20_r0.9_skill"
+        fluid = BKT(kappa=1e6, anchor="fluid", item_params=params, theta_lo=-2, theta_hi=1)
+        assert fluid.name == "bkt_k1e+06_r1_fluid_lo-2_hi1"
+        bad = (
+            {"anchor": "logit"}, {"kappa": 0}, {"rho": 0}, {"rho": 1.5}, {"anchor": "fluid"},
+            {"anchor": "fluid", "item_params": params, "theta_lo": 1, "theta_hi": 1},
+        )
+        for kw in bad:
+            with pytest.raises(ValueError):
+                BKT(**kw)
+        assert ANCHORS == ("skill", "fluid")
