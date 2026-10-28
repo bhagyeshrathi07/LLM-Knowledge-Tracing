@@ -135,7 +135,7 @@ def style_axes(ax: plt.Axes) -> None:
 
 
 def plot_mastery(mastery: pd.DataFrame, params: pd.DataFrame, out: Path, title_setting: str) -> None:
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.2), gridspec_kw={"width_ratios": [1.6, 1]})
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.2), gridspec_kw={"width_ratios": [1.7, 1], "wspace": 0.55})
     fig.patch.set_facecolor(SURFACE)
     last = mastery["checkpoint_idx"].max()
     for skill, g in mastery.groupby("skill"):
@@ -147,16 +147,15 @@ def plot_mastery(mastery: pd.DataFrame, params: pd.DataFrame, out: Path, title_s
         if g.empty:
             continue
         ax1.plot(g["checkpoint_idx"] / last, g["p_learned"], color=color, lw=2.0, label=skill)
-        ax1.annotate(skill, (g["checkpoint_idx"].iloc[-1] / last, g["p_learned"].iloc[-1]),
-                     xytext=(4, 0), textcoords="offset points", fontsize=7.5, color=INK_SECONDARY,
-                     va="center")
     style_axes(ax1)
-    ax1.set_xlim(0, 1.18)
-    ax1.set_ylim(-0.02, 1.02)
+    ax1.set_xlim(0, 1)
+    ax1.set_ylim(-0.04, 1.04)
     ax1.set_xlabel("normalized checkpoint index (index / last index)", fontsize=8, color=INK_SECONDARY)
     ax1.set_ylabel("P(subject learned), filtered", fontsize=8, color=INK_SECONDARY)
     ax1.set_title("Mastery per MMLU subject (57 curves; three named)", fontsize=9, color=INK, loc="left")
-    ax1.legend(fontsize=7.5, frameon=False, loc="lower right")
+    # the curves fill the panel, so the legend sits outside it (identity is never color-alone)
+    ax1.legend(fontsize=7.5, frameon=False, loc="upper left", bbox_to_anchor=(1.0, 1.0),
+               borderaxespad=0.0)
 
     ax2.scatter(params["learn"], params["forget"], s=18, color=MUTED, alpha=0.6, linewidths=0)
     for color, skill in zip(HIGHLIGHT, HIGHLIGHT_SKILLS):
@@ -176,7 +175,7 @@ def plot_mastery(mastery: pd.DataFrame, params: pd.DataFrame, out: Path, title_s
     fig.suptitle(f"BKT on OLMo-2 MMLU ({title_setting})", fontsize=11, color=INK, x=0.01, ha="left")
     fig.text(0.01, 0.91, "Fitted once on all 94 checkpoints; per-item guess and slip shrunk toward "
              "the subject's values.", fontsize=8, color=INK_SECONDARY)
-    fig.tight_layout(rect=(0, 0, 1, 0.9))
+    fig.subplots_adjust(left=0.06, right=0.985, top=0.80, bottom=0.14, wspace=0.6)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=150, facecolor=SURFACE)
     plt.close(fig)
