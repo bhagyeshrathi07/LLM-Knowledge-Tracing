@@ -45,7 +45,7 @@ Our claim, worded carefully: *in the sources reviewed through September 30, 2026
 
 ## 4. What is in the repository
 
-Everything below is on `main` as of 2026-10-27, plus the BKT work on `bhagyesh_branch` (same day). 405 tests pass (`pytest`), `ruff` clean. (At the Oct 19 briefing: 328 tests.)
+Everything below is on `main` as of 2026-10-27, plus the BKT work on `bhagyesh_branch` (same day). 412 tests pass (`pytest`), `ruff` clean. (At the Oct 19 briefing: 328 tests.)
 
 ### Library, `src/llm_kt/`
 
@@ -79,7 +79,7 @@ Notes on the heavier modules:
 
 ### Scripts, `scripts/`
 
-`ingest_fluid.py`, `plot_skill_curves.py`, `run_baselines.py`, `run_models.py` (`--predictors item_mean static_irt tskirt drift_irt`, `--nu`, `--recalibrate`, `--tau`, `--tau-a`, `--q-theta`, `--q-delta`, `--horizon`), `run_calibrated.py`, `run_forgetting.py` (`--chance-check` adds the chance-adjusted table), `analyze_sweep.py`, `analyze_horizons.py`, `analyze_ladder.py` (ladder tables and the two ladder figures in `docs/figures/`), `analyze_drift_irt.py` (selects a DriftIRT setting on validation; paired differences vs. item mean at h = 1, 5, 20), `analyze_bkt.py` (selects the BKT settings on validation; paired differences vs. item mean and vs. the recency-weighted item mean at h = 1, 5, 20; draws the validation grid and the horizon curves; `--mastery` fits and plots per-subject mastery for the selected setting and the per-skill limit; stores every table under `docs/results/bkt/`). `run_models.py` also takes `--predictors bkt item_mean_ewma` with `--kappa`, `--rho`, `--anchor`, `--theta-lo`, `--theta-hi`. Each writes to `data/processed/` (gitignored). The README has the setup, ingest and baseline commands; each script's docstring has its own.
+`ingest_fluid.py`, `plot_skill_curves.py`, `run_baselines.py`, `run_models.py` (`--predictors item_mean static_irt tskirt drift_irt`, `--nu`, `--recalibrate`, `--tau`, `--tau-a`, `--q-theta`, `--q-delta`, `--horizon`), `run_calibrated.py`, `run_forgetting.py` (`--chance-check` adds the chance-adjusted table), `analyze_sweep.py`, `analyze_horizons.py`, `analyze_ladder.py` (ladder tables and the two ladder figures in `docs/figures/`), `analyze_drift_irt.py` (selects a DriftIRT setting on validation; paired differences vs. item mean at h = 1, 5, 20), `analyze_bkt.py` (selects the BKT settings on validation; paired differences vs. item mean and vs. the recency-weighted item mean at h = 1, 5, 20; draws the validation grid and the horizon curves; `--mastery` fits and plots per-subject mastery for the selected setting and the per-skill limit, `--replot-mastery` redraws those two figures from the stored CSVs without refitting; stores every table under `docs/results/bkt/`). `run_models.py` also takes `--predictors bkt item_mean_ewma` with `--kappa`, `--rho`, `--anchor`, `--theta-lo`, `--theta-hi`. Each writes to `data/processed/` (gitignored). The README has the setup, ingest and baseline commands; each script's docstring has its own.
 
 ### Documents
 

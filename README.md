@@ -76,6 +76,7 @@ python scripts/run_models.py --models olmo2-7b --benchmarks mmlu \
     --predictors item_mean_ewma --rho 0.9 --horizon 1 --tag bkt_ewma   # recency-weighted item mean, the control (also at --horizon 5 and 20)
 python scripts/analyze_bkt.py --mastery   # selects on validation, compares with item mean and the control,
                                           # writes docs/results/bkt/ and the four figures in docs/figures/bkt_*.png
+python scripts/analyze_bkt.py --replot-mastery   # redraw the two mastery figures from the stored CSVs (no refit)
 ```
 
 ## Tests

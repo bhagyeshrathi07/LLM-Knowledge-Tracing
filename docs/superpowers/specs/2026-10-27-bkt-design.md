@@ -210,9 +210,10 @@ layout of the mastery figure; test tolerances.
 ## 11. Results (2026-10-27)
 
 Written up in `docs/project-notes.md` §9 and `docs/team-briefing.md` §5.8. Tables and the
-console report are stored under `docs/results/bkt/`; the figures are
-`docs/figures/bkt_mastery_olmo2-7b.png` (selected setting) and
-`docs/figures/bkt_mastery_olmo2-7b_k1e+06_r1.png` (per-skill limit). One addition to the
+console report are stored under `docs/results/bkt/`; the figures, all drawn by
+`scripts/analyze_bkt.py`, are `docs/figures/bkt_validation_grid.png` (the grid),
+`bkt_horizons.png` (further ahead), `bkt_mastery_olmo2-7b.png` (selected setting) and
+`bkt_mastery_olmo2-7b_k1e+06_r1.png` (per-skill limit). One addition to the
 plan: a recency-weighted item mean (`ItemMeanEWMA` in `baselines.py`, `--predictors
 item_mean_ewma`) was run as the control the anti-goal in §7 asks for, and `analyze_bkt.py`
 pairs the selected setting against it.
