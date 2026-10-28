@@ -15,14 +15,19 @@ is also paired against skill_mean. When models_<horizon-tag>_h{5,20}.parquet exi
 comparison is repeated on their test block. Only the validation block is used for selection.
 
 --mastery fits the selected skill-anchored setting once on the full OLMo-2 MMLU history and
-writes data/processed/bkt_mastery_olmo2-7b.csv, bkt_skill_params_olmo2-7b.csv and the figure
-docs/figures/bkt_mastery_olmo2-7b.png (per-subject P(learned) over training; learn vs forget).
+writes the mastery and skill-parameter CSVs and the figure docs/figures/bkt_mastery_olmo2-7b.png
+(per-subject P(learned) over training; learn vs forget).
+
+Everything printed is also stored under --out-dir (default docs/results/bkt, committed, unlike
+data/processed): validation_table.csv, h{1,5,20}_scores.csv, h{1,5,20}_paired_differences.csv,
+bkt_mastery_olmo2-7b.csv, bkt_skill_params_olmo2-7b.csv and analysis.txt (the console report).
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -37,6 +42,7 @@ from llm_kt.evaluate import paired_difference, summarize
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROC = REPO_ROOT / "data" / "processed"
 FIG_DIR = REPO_ROOT / "docs" / "figures"
+RESULTS_DIR = REPO_ROOT / "docs" / "results" / "bkt"
 FOCUS_MODEL = "olmo2-7b"
 ITEM_MEAN = "item_mean"
 SKILL_MEAN = "skill_mean"
@@ -109,7 +115,8 @@ def compare(df: pd.DataFrame, best: str, against: str = ITEM_MEAN, scopes=SCOPES
     return pd.concat(tables, ignore_index=True), pd.concat(diffs, ignore_index=True)
 
 
-def report(df: pd.DataFrame, best: str, against: str, label: str, scopes=SCOPES) -> None:
+def report(df: pd.DataFrame, best: str, against: str, label: str, scopes=SCOPES):
+    """Print the comparison and return (scores, paired differences) tagged with the label."""
     cols = ["n", "log_loss", "log_loss_se", "auc", "auc_se"]
     table, diffs = compare(df, best, against, scopes)
     print(f"\n{label}: scores, cluster-bootstrap SEs over skills (n_boot={N_BOOT})")
@@ -117,6 +124,28 @@ def report(df: pd.DataFrame, best: str, against: str, label: str, scopes=SCOPES)
     print(f"\n{label}: paired difference, {best} minus {against}")
     print(diffs.set_index(["scope", "metric"])[["diff", "se", "ci_low", "ci_high", "n_slices"]]
           .round(4).to_string())
+    table.insert(0, "comparison", label)
+    diffs.insert(0, "comparison", label)
+    diffs.insert(1, "a", best)
+    diffs.insert(2, "b", against)
+    return table, diffs
+
+
+class _Tee:
+    """Write to stdout and a file at once, so the console report is stored verbatim."""
+
+    def __init__(self, path: Path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._f = path.open("w")
+        self._out = sys.stdout
+
+    def write(self, s: str) -> None:
+        self._out.write(s)
+        self._f.write(s)
+
+    def flush(self) -> None:
+        self._out.flush()
+        self._f.flush()
 
 
 # -- mastery figure ------------------------------------------------------------------------
@@ -196,22 +225,34 @@ def main() -> None:
     parser.add_argument("--mastery", action="store_true", help="fit the selected setting on the full history and plot")
     parser.add_argument("--kappa", type=float, default=None, help="override kappa for the mastery fit")
     parser.add_argument("--rho", type=float, default=None, help="override rho for the mastery fit")
+    parser.add_argument("--out-dir", type=Path, default=RESULTS_DIR,
+                        help="where every table and the console report are stored")
     args = parser.parse_args()
     pd.set_option("display.width", 200)
+    out_dir: Path = args.out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    sys.stdout = _Tee(out_dir / "analysis.txt")
+    scores: dict[int, list] = {1: [], 5: [], 20: []}
+    diffs: dict[int, list] = {1: [], 5: [], 20: []}
 
     df = load_grid(PROC / args.grid)
     val = summarize(df[df["block"] == "val"], by=["predictor"]).sort_values("log_loss")
     print("Validation block, every predictor (lower log_loss better)")
     print(val.set_index("predictor")[["n", "log_loss", "brier", "accuracy", "auc"]].round(4).to_string())
+    val.to_csv(out_dir / "validation_table.csv", index=False)
 
     best_skill, best_fluid = select(val)
     print(f"\nSelected on validation log-loss: skill anchor {best_skill}; fluid anchor {best_fluid}")
     chosen = [(best_skill, "best skill-anchored"), (best_fluid, "best Fluid-anchored"), (LIMIT, "per-skill limit")]
     for name, label in chosen:
         if name is not None and name in set(df["predictor"]):
-            report(df, name, ITEM_MEAN, f"h=1, {label} ({name}) vs item_mean")
+            t, d = report(df, name, ITEM_MEAN, f"h=1, {label} ({name}) vs item_mean")
+            scores[1].append(t)
+            diffs[1].append(d)
     if LIMIT in set(df["predictor"]) and SKILL_MEAN in set(df["predictor"]):
-        report(df, LIMIT, SKILL_MEAN, f"h=1, per-skill limit ({LIMIT}) vs skill_mean")
+        t, d = report(df, LIMIT, SKILL_MEAN, f"h=1, per-skill limit ({LIMIT}) vs skill_mean")
+        scores[1].append(t)
+        diffs[1].append(d)
 
     for h in (5, 20):
         path = PROC / f"models_{args.horizon_tag}_h{h}.parquet"
@@ -221,18 +262,26 @@ def main() -> None:
         hdf = pd.read_parquet(path)
         for name, label in chosen:
             if name is not None and name in set(hdf["predictor"]):
-                report(hdf, name, ITEM_MEAN, f"h={h}, {label} ({name}) vs item_mean", scopes=("pooled", "test"))
+                t, d = report(hdf, name, ITEM_MEAN, f"h={h}, {label} ({name}) vs item_mean",
+                              scopes=("pooled", "test"))
+                scores[h].append(t)
+                diffs[h].append(d)
+    for h in (1, 5, 20):
+        if scores[h]:
+            pd.concat(scores[h], ignore_index=True).to_csv(out_dir / f"h{h}_scores.csv", index=False)
+            pd.concat(diffs[h], ignore_index=True).to_csv(
+                out_dir / f"h{h}_paired_differences.csv", index=False)
 
     if args.mastery:
         kappa, rho, _ = parse_name(best_skill)
         kappa = args.kappa if args.kappa is not None else kappa
         rho = args.rho if args.rho is not None else rho
         mastery, params = fit_mastery(kappa, rho)
-        mastery.to_csv(PROC / f"bkt_mastery_{FOCUS_MODEL}.csv", index=False)
-        params.to_csv(PROC / f"bkt_skill_params_{FOCUS_MODEL}.csv", index=False)
+        mastery.to_csv(out_dir / f"bkt_mastery_{FOCUS_MODEL}.csv", index=False)
+        params.to_csv(out_dir / f"bkt_skill_params_{FOCUS_MODEL}.csv", index=False)
         out = FIG_DIR / f"bkt_mastery_{FOCUS_MODEL}.png"
         plot_mastery(mastery, params, out, f"kappa={kappa:g}, rho={rho:g}")
-        print(f"\nWrote {out} and the mastery / skill-parameter CSVs under {PROC}")
+        print(f"\nWrote {out} and the mastery / skill-parameter CSVs under {out_dir}")
         print(params.sort_values("learn", ascending=False).round(4).to_string(index=False))
 
 
