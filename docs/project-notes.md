@@ -329,7 +329,7 @@ Context: the primary models (BKT, temporal IRT) fit per skill. For a skill like 
 ### Rest of semester 1 (weeks 9–15, ~Oct 20–Dec 12)
 
 - Baselines: static 2PL IRT per checkpoint (Fluid), per-skill accuracy curves (MathCAMPS-style), threshold emergence (Implicit Curriculum).
-- First KT model: BKT with forgetting, one transition per checkpoint, batched observations. pyBKT as a starting point; likely need a custom HMM.
+- First KT model: BKT with forgetting, one transition per checkpoint, batched observations. pyBKT as a starting point; likely need a custom HMM. **Done 2026-10-27 as a custom log-space HMM with per-item emissions; see §9.**
 - Eval harness: hold out checkpoint t+1, predict item responses, AUC + log-loss. Compare against a "copy last checkpoint" baseline, which will be hard to beat since adjacent checkpoints are near-identical; widen checkpoint gaps if so.
 - First result on Fluid data with MMLU subjects: one figure, per-subject mastery curve with uncertainty for one model. Centerpiece of the 295A presentation.
 - 295A deliverables: report (abstract, related work, method, preliminary results, 295B plan) and presentation.
@@ -379,3 +379,123 @@ Raised by the advisor on 2026-10-19 (`meetings/2026-10-19-advisor.md`) as a late
 **Open questions.** What counts as a "skill" or topic in free conversation (hand-tagged domains, clustered claims, or the retrieval source); whether a step-level clock inside one long chain is too fine to carry a state; and how to separate hallucination caused by the conversation's history from hallucination the model would have produced on the first turn anyway.
 
 **Status.** Future work only. Revisit after the Phase 2 go/no-go (2026-12-12) if semester 2 has room.
+
+---
+
+## 9. BKT: design, why, results (2026-10-27)
+
+Action item from the 2026-10-19 advisor meeting: "log-space BKT with forgetting and per-item emissions, scored against the item-mean bar." Code: `src/llm_kt/bkt.py` (25 tests in `tests/test_bkt.py`), `scripts/run_models.py --predictors bkt`, `scripts/analyze_bkt.py`. Design document: `docs/superpowers/specs/2026-10-27-bkt-design.md`; implementation plan: `docs/superpowers/plans/2026-10-27-bkt.md`. Every table below is also stored as a CSV under `docs/results/bkt/`, with the console report in `docs/results/bkt/analysis.txt`.
+
+### What BKT is here
+
+Bayesian Knowledge Tracing is the second model family adopted in Decision 2. For each MMLU subject the model has a hidden state with two values, *not learned* and *learned*. The state can switch once per checkpoint: up with probability `learn`, down with probability `forget`. At each checkpoint every question in the subject is one noisy reading of that state: a learned subject answers question `i` correctly with probability `1 - slip_i`, an unlearned one with probability `guess_i`. The readings at one checkpoint are combined by adding their log-probabilities, so a subject with 1,500 questions gives one very sharp reading per checkpoint instead of 1,500 practice opportunities. That is Decision 1 applied to BKT: the model learns between checkpoints, and the test is a thermometer.
+
+To predict `h` checkpoints ahead, the filtered state at the last seen checkpoint is pushed through the transition `h` times, which pulls it toward its long-run value, and the prediction for question `i` is `P(learned) (1 - slip_i) + P(not learned) guess_i`. There is no separate forecast-uncertainty knob; longer horizons get softer on their own.
+
+### The four design choices and why
+
+- **Log space, own implementation.** pyBKT multiplies raw emission probabilities before normalising. With 100 to 1,534 items per checkpoint the product underflows to zero, so pyBKT cannot be used on batched checkpoints. We run forward-backward on log-probabilities with `logsumexp`; a test checks a 2,000-item checkpoint against brute force.
+- **Forgetting.** A forget rate is native to BKT and is what lets the state go down. The item mean never forgets. The forgetting analysis (§5.6 of the briefing) is the paper's story, so the learner model must be able to express it.
+- **Per-item guess and slip.** With one guess/slip pair per subject, every question in the subject gets the same probability at a checkpoint, and within-subject AUC is 0.50 by construction. The baseline ladder says per-question information is what matters, so each question gets its own guess and slip. We still run the per-subject version as a limit to show the gap.
+- **Shrinkage with recency, two anchors.** 14,042 questions times two parameters, each seen at most 94 times, overfit if left free and trade off against the state. Each question's guess and slip start at an anchor and move away only as evidence accumulates, with pseudo-count `kappa`. Recent checkpoints can count more through `rho^(age)`. Anchor `skill`: the subject's own shared guess/slip, learned by EM. Anchor `fluid`: the guess and slip implied by Fluid's published 2PL parameters at two global ability levels, the "borrowed parameters" variant.
+
+Fitting is MAP-EM per subject at every origin of the walk-forward harness, warm-started from the previous origin. The skill-level rates get a weak pseudo-count prior so a two-checkpoint history cannot push a rate to exactly 0 or 1. The item-level update with `rho < 1` is a forgetting-factor approximation, not exact EM. `kappa` at or above 1e5 pins every question to its anchor exactly, which is how the per-subject limit is produced; this guarantees the ties that give AUC 0.50 rather than leaving them to floating-point luck.
+
+### The grid and the selection rule
+
+Everything is OLMo-2 on MMLU (Decision 6: learner models on MMLU only), horizon 1, walk-forward with at least two checkpoints of history. The grid is `kappa` in {0.1, 0.3, 1, 5, 20, 100, 1e6} by `rho` in {1.0, 0.9, 0.7} for the skill anchor, and `kappa` in {1, 5, 20, 100, 1e6} by the same `rho` by `(theta_lo, theta_hi)` in {(-1, 1), (-2, 1), (-1, 2)} for the Fluid anchor. The `kappa` values 0.3 and 0.1 were added after the first pass put the optimum at the grid's lower edge. The best skill-anchored and best Fluid-anchored setting are chosen by validation log-loss (checkpoints 56 to 74) and only then scored on the test block (75 to 93) and at horizons 5 and 20. Test numbers are reported, never ranked.
+
+The grid took one evening on a laptop: about 10 minutes per setting at horizon 1 (63 settings in eight parallel chunks), 70 minutes per setting at horizon 20.
+
+### Results at horizon 1 (OLMo-2, MMLU)
+
+Validation-block ranking, the one used to choose. Full table: `docs/results/bkt/validation_table.csv` (63 rows).
+
+| Setting                                         | Val log-loss | Val AUC |
+| ----------------------------------------------- | ------------ | ------- |
+| BKT, skill anchor, `kappa` 0.1, `rho` 0.9       | 0.326        | 0.925   |
+| BKT, skill anchor, `kappa` 0.3, `rho` 0.9       | 0.326        | 0.925   |
+| BKT, Fluid anchor (−2, 1), `kappa` 1, `rho` 0.9 | 0.331        | 0.923   |
+| Recency-weighted item mean, `rho` 0.9           | 0.332        | 0.927   |
+| BKT, skill anchor, `kappa` 1, `rho` 0.9         | 0.351        | 0.925   |
+| BKT, skill anchor, `kappa` 0.1, `rho` 1         | 0.375        | 0.910   |
+| Item mean (the bar)                             | 0.386        | 0.912   |
+| BKT, skill anchor, `kappa` 5, `rho` 1           | 0.414        | 0.908   |
+| Skill mean                                      | 0.626        | 0.500   |
+| BKT per-skill limit (`kappa` 1e6)               | 0.630        | 0.500   |
+
+Selected: skill anchor with `kappa` 0.1 and `rho` 0.9; Fluid anchor with `theta_lo` −2, `theta_hi` 1, `kappa` 1, `rho` 0.9. Both optima sit at `rho` 0.9; `rho` 0.7 is always worse. The Fluid optimum is at its grid's lower `kappa` edge; that grid was not extended (each Fluid chunk took 3.5 hours, and the skill anchor already won at every shared `kappa`).
+
+Scores for the chosen settings. "±" is a bootstrap standard error over the 57 subjects. Stored in `docs/results/bkt/h1_scores.csv`.
+
+| Predictor                                       | Pooled log-loss | Pooled AUC | Test log-loss | Test AUC      |
+| ----------------------------------------------- | --------------- | ---------- | ------------- | ------------- |
+| Item mean (the bar)                             | 0.457           | 0.862      | 0.375 ± 0.015 | 0.916 ± 0.006 |
+| Recency-weighted item mean, `rho` 0.9 (control) | 0.403           | 0.880      | 0.317 ± 0.019 | 0.933 ± 0.006 |
+| BKT, skill anchor, `kappa` 0.1, `rho` 0.9       | 0.411           | 0.880      | 0.310 ± 0.023 | 0.933 ± 0.006 |
+| BKT, Fluid anchor, `kappa` 1, `rho` 0.9         | 0.388           | 0.882      | 0.316 ± 0.022 | 0.929 ± 0.007 |
+| BKT per-skill limit (`kappa` 1e6)               | 0.637           | 0.500      | 0.623 ± 0.011 | 0.500         |
+| Skill mean                                      | 0.632           | 0.500      | 0.618 ± 0.013 | 0.500         |
+
+Paired differences on the test block, BKT minus the other predictor, with 95% intervals. Negative log-loss and positive AUC favour BKT. Stored in `docs/results/bkt/h1_paired_differences.csv` and `extra_paired_differences.csv`.
+
+| Comparison                                        | Log-loss                | AUC                     | Reading                               |
+| ------------------------------------------------- | ----------------------- | ----------------------- | ------------------------------------- |
+| BKT skill anchor minus item mean                  | −0.065 [−0.078, −0.045] | +0.017 [+0.014, +0.020] | BKT wins on both                      |
+| BKT Fluid anchor minus item mean                  | −0.059 [−0.073, −0.039] | +0.014 [+0.009, +0.017] | BKT wins on both                      |
+| BKT per-skill limit minus item mean               | +0.248 [+0.216, +0.270] | −0.416 [−0.425, −0.403] | the limit loses badly                 |
+| BKT per-skill limit minus skill mean              | +0.005 [+0.004, +0.006] | 0 (both 0.50)           | the limit is the skill mean           |
+| BKT skill anchor minus recency-weighted item mean | −0.007 [−0.013, +0.002] | −0.001 [−0.002, +0.000] | tie                                   |
+| BKT Fluid anchor minus recency-weighted item mean | −0.000 [−0.008, +0.009] | −0.004 [−0.007, −0.002] | tie on log-loss, control ranks better |
+
+### Further ahead
+
+Test-block log-loss, pooled in brackets. Horizon 5 and 20 runs use the settings chosen at horizon 1. Stored in `docs/results/bkt/h5_scores.csv`, `h20_scores.csv` and the paired-difference files.
+
+| Horizon | Item mean     | Recency item mean | BKT skill anchor | BKT Fluid anchor | BKT skill minus item mean | BKT skill minus recency item mean |
+| ------- | ------------- | ----------------- | ---------------- | ---------------- | ------------------------- | --------------------------------- |
+| 1       | 0.375 [0.457] | 0.317 [0.403]     | 0.310 [0.411]    | 0.316 [0.388]    | −0.065 [−0.078, −0.045]   | −0.007 [−0.013, +0.002], tie      |
+| 5       | 0.382 [0.484] | 0.326 [0.430]     | 0.323 [0.450]    | 0.326 [0.405]    | −0.059 [−0.071, −0.041]   | −0.002 [−0.009, +0.008], tie      |
+| 20      | 0.414 [0.545] | 0.355 [0.487]     | 0.359 [0.525]    | 0.356 [0.436]    | −0.055 [−0.067, −0.039]   | +0.003 [−0.002, +0.011], tie      |
+
+Unlike T-SKIRT (§5.4 of the briefing), BKT keeps its lead over the item mean at horizon 20 on the test block, because its per-item part never spreads out with horizon the way a forecast variance does. Against the recency-weighted item mean it is a tie at every horizon on the test block, and on the pooled run the control is better (by 0.008, 0.020 and 0.038 log-loss at horizons 1, 5 and 20, all intervals excluding zero).
+
+The Fluid anchor is the one setting that beats the control anywhere: pooled over the whole run it leads the recency-weighted item mean by 0.015, 0.025 and 0.051 log-loss at horizons 1, 5 and 20 (intervals exclude zero), while tying it on the late test block. The pooled run includes the early checkpoints, where an item has been seen a handful of times and a prior from Fluid's published parameters is worth something; by the test block every item has 75 or more observations and its own recent history is all that matters.
+
+### What `kappa` and `rho` say
+
+- **`kappa` 0.1** means each question's guess and slip move off the subject anchor after a fraction of one observation. The question-level parameters are essentially free, and the grid is flat below `kappa` 1 (0.326, 0.326, 0.327 at 0.1, 0.3, 0.03). The model wanted every question to carry its own numbers, which is the baseline-ladder finding again (§5.1 of the briefing).
+- **`rho` 0.9** (half-life of about 6.6 checkpoints) is where the win comes from. With `rho` 1, no setting beats the item mean on the test block (0.364 and 0.372 against 0.375 for `kappa` 0.1 and 1), and on validation they tie it (0.375 and 0.380 against 0.386). Turning recency on moves the test log-loss from 0.364 to 0.310. This matches what Ronak reported for DriftIRT.
+- With `kappa` near zero and `rho` below one, BKT's per-item emission for a question is a recency-weighted average of that question's own answers, split by the hidden state. When the state is constant, that is exactly the recency-weighted item mean. That is why the control was built and why it ties.
+
+### The mastery figure
+
+`docs/figures/bkt_mastery_olmo2-7b.png` is the selected setting fitted once on all 94 OLMo-2 checkpoints (tables: `docs/results/bkt/bkt_mastery_olmo2-7b.csv`, `bkt_skill_params_olmo2-7b.csv`). It should be read as a diagnostic, not as a learning curve:
+
+- The filtered state is 0 or 1 (outside 0.01 to 0.99) on 98.5% of subject-checkpoints. With hundreds of readings per checkpoint a two-state model is always certain.
+- The median subject switches state once; the worst switches 33 times. Seven subjects never leave the "not learned" state at all (`college_mathematics`, `college_physics`, `elementary_mathematics`, `global_facts`, `high_school_mathematics`, `high_school_physics`, `professional_accounting`): EM stopped after three iterations with `learn` at 0.001, and their per-question parameters carry all the information. Fifty of 57 subjects end in the learned state.
+- For several subjects the two states are not "knows" and "does not know". `moral_scenarios` ends with `slip` 0.74 in the learned state and `guess` 0.21 in the other, which is two near-identical states that the per-question parameters then correct. This is the identifiability problem the design document predicted for small `kappa`: the per-question parameters explain the history and the state has nothing left to do.
+- Learn rates are 0.05 to 0.86 per checkpoint (median 0.10); forget rates have median 0.001 and a tail to 0.35. The tail is not evidence of forgetting in the model: it belongs to subjects whose state flips back and forth to relabel noise.
+
+**The per-skill limit is the figure to read for when subjects were learned.** `docs/figures/bkt_mastery_olmo2-7b_k1e+06_r1.png` is the same fit with `kappa` 1e6 and `rho` 1 (classic BKT, one guess/slip pair per subject; tables with the `_k1e+06_r1` suffix). There the state means what it says: curves are single steps, 45 of 57 subjects end learned, the median subject switches on at checkpoint 8 of 93 (about 9% of the way through training; earliest `virology` at 6, latest `machine_learning` at 29), and only nine subjects switch more than twice. Fitted forget rates are at most 0.047 per checkpoint (`professional_medicine`), with a median of zero, so this model sees no forgetting in OLMo-2 on MMLU, consistent with §5.6 of the briefing. Twelve subjects never leave "not learned": the mathematics and physics subjects, `abstract_algebra`, `formal_logic`, `econometrics`, `global_facts`, `moral_scenarios` and `professional_law`, which are the subjects where OLMo-2 stays near chance, so the learned state is never the better explanation. This is the mastery figure Decision 2 promised, and it costs 0.31 log-loss against the predictive setting.
+
+### Honest verdict
+
+The briefing's open question 1 asked whether BKT with per-item emissions would also only tie the item mean. It does better than that: on the late test block it beats the bar by 0.065 log-loss and 0.017 AUC at horizon 1 and holds the lead to horizon 20. But the control shows where the gain lives. A recency-weighted item mean, one line of code with the same `rho`, ties BKT on the test block at every horizon and beats it pooled. The per-skill state adds nothing measurable at the selected setting, and classic per-skill BKT (the `kappa` 1e6 limit) is the skill mean with AUC 0.50. The shared finding across T-SKIRT, DriftIRT and BKT is therefore sharper than the one proposed in the briefing: *recent per-item state is what matters*. The only place a prior beyond the question's own history helped was the Fluid anchor early in training, when histories are short.
+
+What BKT still offers the project is the forgetting machinery and the interpretable state, and the figure shows that at a setting chosen for prediction the state is not interpretable. The two goals pull against each other: prediction wants small `kappa`, interpretation wants large.
+
+### Limitations
+
+- Checkpoint index is the clock; uneven spacing in steps or tokens is ignored (T-SKIRT and DriftIRT can use the other clocks).
+- The recency-weighted item step is a forgetting-factor approximation inside EM, not exact EM; the fitted `loglik` is not a likelihood of the data under one model.
+- Two of 57 subjects hit the 50-iteration cap in the full-history fit, and the seven never-learned subjects stopped at a cold-start fixed point. A second initialisation (start in the learned state) was not tried.
+- One model (OLMo-2 7B), one benchmark (MMLU), per Decision 6. The per-skill limit's AUC of 0.50 is by construction and holds for any model.
+- Selection used horizon 1 only; the horizon 5 and 20 runs reuse those settings. `kappa` 1 is better than `kappa` 0.1 pooled at horizons 5 and 20 (0.435 against 0.450; 0.477 against 0.525) but worse on the test block, so the choice does not change the verdict.
+
+### Next steps
+
+1. Decide with the team whether the recency-weighted item mean replaces the item mean as the bar. If it does, every learner model is re-scored against it; T-SKIRT and DriftIRT have not been.
+2. Fit the per-skill limit with a second initialisation and report its mastery curves as the forgetting story's figure; that figure, not the selected setting's, is the one to show the advisor.
+3. Pool across the six models at the skill level (shared `learn` and `forget` per subject, per-model emissions) as the one way a per-skill state could add information the item's own history does not have.
+4. Try the Fluid anchor with `kappa` below 1 and with `rho` between 0.9 and 1, since both optima were at grid edges in the directions that matter least for the verdict.
