@@ -55,6 +55,30 @@ python scripts/run_baselines.py --horizon 1
 
 Trivial predictors in `src/llm_kt/baselines.py`: `global_mean`, `skill_mean`, `item_mean`, `copy_last`, `copy_last_calibrated`. The strongest is `item_mean` (pooled h=1: log-loss 0.360, within-skill AUC 0.80; MMLU only: 0.483 / 0.79). A learner model must beat it on the same benchmark subset and horizon to have learned something the raw data did not already say. AUC is computed within (model, checkpoint, skill) slices, so any predictor that is constant within a skill scores 0.50 by construction. To add a model, implement the `Predictor` protocol in `src/llm_kt/evaluate.py` (it receives the forecast `horizon`) and pass it to `evaluate()`. Results are written to `data/processed/baseline_results_h{horizon}.parquet`.
 
+## Learner models
+
+`scripts/run_models.py` scores the learner models with the same harness: static IRT persistence, T-SKIRT, DriftIRT, BKT (`src/llm_kt/bkt.py`, a per-skill two-state model with one transition per checkpoint, batched log-space emissions and per-item guess/slip shrunk toward an anchor). Learner models run on MMLU only; the other benchmarks stay for the ladder, transfer tests and controls.
+
+```bash
+# the h = 1 grid as run on 2026-10-27 (about 10 min per setting; split --kappa / --anchor over
+# several processes with different --tag values and concatenate into models_bkt_grid_h1.parquet)
+python scripts/run_models.py --models olmo2-7b --benchmarks mmlu \
+    --predictors bkt item_mean skill_mean --kappa 0.03 0.1 0.3 1 5 20 100 1e6 --rho 1.0 0.9 0.7 \
+    --anchor skill fluid --theta-lo -1 -2 --theta-hi 1 2 --horizon 1 --tag bkt_grid
+# the selected settings further ahead (models_bkt_best_h{5,20}.parquet; about 70 min per setting at h = 20)
+for h in 5 20; do
+  python scripts/run_models.py --models olmo2-7b --benchmarks mmlu --predictors bkt item_mean skill_mean \
+      --anchor skill --kappa 0.1 1 1e6 --rho 0.9 --horizon $h --tag bkt_bestS
+  python scripts/run_models.py --models olmo2-7b --benchmarks mmlu --predictors bkt \
+      --anchor fluid --theta-lo -2 --theta-hi 1 --kappa 1 --rho 0.9 --horizon $h --tag bkt_bestF
+done   # then concatenate bkt_bestS and bkt_bestF into models_bkt_best_h{5,20}.parquet
+python scripts/run_models.py --models olmo2-7b --benchmarks mmlu \
+    --predictors item_mean_ewma --rho 0.9 --horizon 1 --tag bkt_ewma   # recency-weighted item mean, the control (also at --horizon 5 and 20)
+python scripts/analyze_bkt.py --mastery   # selects on validation, compares with item mean and the control,
+                                          # writes docs/results/bkt/ and the four figures in docs/figures/bkt_*.png
+python scripts/analyze_bkt.py --replot-mastery   # redraw the two mastery figures from the stored CSVs (no refit)
+```
+
 ## Tests
 
 ```bash
