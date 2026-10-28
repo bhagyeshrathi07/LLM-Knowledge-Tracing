@@ -174,9 +174,9 @@ Test-block log-loss further ahead (pooled in brackets), with the paired differen
 Reading, in five lines:
 
 - BKT beats the bar on both metrics at every horizon, including horizon 20 where T-SKIRT lost. The gain is 0.06 log-loss and 0.017 AUC on the test block.
-- The whole gain is recency. With `rho` 1 no BKT setting beats the item mean; a recency-weighted item mean (one line, same `rho`) ties BKT on the test block at every horizon and beats it pooled.
+- Most of the gain is recency. With `rho` 1 the best BKT setting beats the item mean by only 0.013 log-loss on the test block; with `rho` 0.9 by 0.065. A recency-weighted item mean (one line, same `rho`) ties BKT on the test block at every horizon and beats it pooled.
 - Classic BKT with one guess/slip pair per subject is the skill mean: log-loss 0.62, AUC 0.50 by construction. Per-question numbers are not optional.
-- The Fluid-anchored variant is the only one that beats the control anywhere: pooled over the run (which includes early training, when histories are short) it leads by 0.015 to 0.051 log-loss; on the test block it ties.
+- The Fluid-anchored variant is the only one that beats the control anywhere: pooled over the run (which includes early training, when histories are short) it leads by 0.015 to 0.051 log-loss; on the test block it ties on log-loss and the control ranks slightly better (AUC −0.004).
 - At the chosen setting the mastery state is not interpretable: it sits at 0 or 1 on 98.5% of checkpoints, seven subjects never leave "not learned", and some subjects' two states are near-identical. Prediction wants small `kappa`; interpretation wants large. The per-skill-limit figure (`docs/figures/bkt_mastery_olmo2-7b_k1e+06_r1.png`) is the one to read for when each subject was learned.
 
 Verdict: the three learner models share one finding, sharper than open question 1 put it: recent per-item state is what matters. Next: decide whether the recency-weighted item mean becomes the bar (T-SKIRT and DriftIRT have not been scored against it), and pool `learn`/`forget` across the six models as the one way a per-skill state could still add information.

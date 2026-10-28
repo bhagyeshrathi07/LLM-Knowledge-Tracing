@@ -16,7 +16,9 @@ comparison is repeated on their test block. Only the validation block is used fo
 When models_<ewma-tag>_h{1,5,20}.parquet exist (run_models.py --predictors item_mean_ewma
 --rho R), the best skill-anchored setting is also paired against the recency-weighted item
 mean with the same rho: the control that says whether BKT's gain over item_mean is more than
-recency weighting alone.
+recency weighting alone. Three further comparisons go to extra_scores.csv and
+extra_paired_differences.csv: the Fluid anchor vs the control, the Fluid anchor vs the skill
+anchor, and the best skill-anchored setting with rho = 1 (recency off) vs item_mean.
 
 --mastery fits the selected skill-anchored setting once on the full OLMo-2 MMLU history and
 writes the mastery and skill-parameter CSVs and the figure docs/figures/bkt_mastery_olmo2-7b.png
@@ -80,6 +82,32 @@ def ewma_name(bkt_name: str) -> str:
     return f"item_mean_ewma_r{rho:g}"
 
 
+def select_no_recency(val: pd.DataFrame) -> str | None:
+    """Best skill-anchored setting with rho = 1 below the pin limit: BKT with recency off."""
+    names = [n for n in val.sort_values("log_loss")["predictor"] if NAME_RE.match(n)]
+    for n in names:
+        kappa, rho, anchor = parse_name(n)
+        if anchor == "skill" and rho == 1.0 and kappa < KAPPA_LIMIT:
+            return n
+    return None
+
+
+def extra_pairs(best_skill: str, best_fluid: str | None, no_recency: str | None, control: str,
+                present: set[str]) -> list[tuple[str, str, str]]:
+    """(a, b, label) comparisons beyond the item_mean ones, restricted to predictors present.
+
+    Fluid anchor vs the recency control and vs the selected skill anchor (does a borrowed
+    prior add anything?), and the best no-recency skill setting vs item_mean (how much of the
+    gain is recency?).
+    """
+    pairs = [
+        (best_fluid, control, "best Fluid-anchored vs recency control"),
+        (best_fluid, best_skill, "best Fluid-anchored vs best skill-anchored"),
+        (no_recency, ITEM_MEAN, "best skill-anchored with rho = 1 vs item_mean"),
+    ]
+    return [(a, b, lab) for a, b, lab in pairs if a is not None and a in present and b in present]
+
+
 def _with_control(df: pd.DataFrame, path: Path) -> pd.DataFrame:
     """Append the item_mean_ewma rows from `path` when it exists; otherwise return df."""
     if not path.exists():
@@ -95,8 +123,9 @@ def load_grid(path: Path) -> pd.DataFrame:
         raise FileNotFoundError(
             f"{path} missing; produce it with\n"
             "  python scripts/run_models.py --models olmo2-7b --benchmarks mmlu "
-            "--predictors bkt item_mean skill_mean --kappa 1 5 20 100 1e6 --rho 1.0 0.9 0.7 "
-            "--anchor skill fluid --horizon 1 --tag bkt_grid"
+            "--predictors bkt item_mean skill_mean --kappa 0.03 0.1 0.3 1 5 20 100 1e6 "
+            "--rho 1.0 0.9 0.7 --anchor skill fluid --theta-lo -1 -2 --theta-hi 1 2 "
+            "--horizon 1 --tag bkt_grid (chunk it over several processes; see README)"
         )
     return pd.read_parquet(path)
 
@@ -257,6 +286,8 @@ def main() -> None:
     sys.stdout = _Tee(out_dir / "analysis.txt")
     scores: dict[int, list] = {1: [], 5: [], 20: []}
     diffs: dict[int, list] = {1: [], 5: [], 20: []}
+    extra_scores: list = []
+    extra_diffs: list = []
 
     df = load_grid(PROC / args.grid)
     df = _with_control(df, PROC / f"models_{args.ewma_tag}_h1.parquet")
@@ -282,6 +313,13 @@ def main() -> None:
         t, d = report(df, best_skill, control, f"h=1, best skill-anchored ({best_skill}) vs {control}")
         scores[1].append(t)
         diffs[1].append(d)
+    no_recency = select_no_recency(val)
+    for a, b, label in extra_pairs(best_skill, best_fluid, no_recency, control, set(df["predictor"])):
+        t, d = report(df, a, b, f"h=1, {label} ({a} vs {b})")
+        t.insert(1, "h", 1)
+        d.insert(1, "h", 1)
+        extra_scores.append(t)
+        extra_diffs.append(d)
 
     for h in (5, 20):
         path = PROC / f"models_{args.horizon_tag}_h{h}.parquet"
@@ -300,11 +338,21 @@ def main() -> None:
                           scopes=("pooled", "test"))
             scores[h].append(t)
             diffs[h].append(d)
+        for a, b, label in extra_pairs(best_skill, best_fluid, no_recency, control, set(hdf["predictor"])):
+            t, d = report(hdf, a, b, f"h={h}, {label} ({a} vs {b})", scopes=("pooled", "test"))
+            t.insert(1, "h", h)
+            d.insert(1, "h", h)
+            extra_scores.append(t)
+            extra_diffs.append(d)
     for h in (1, 5, 20):
         if scores[h]:
             pd.concat(scores[h], ignore_index=True).to_csv(out_dir / f"h{h}_scores.csv", index=False)
             pd.concat(diffs[h], ignore_index=True).to_csv(
                 out_dir / f"h{h}_paired_differences.csv", index=False)
+
+    if extra_scores:
+        pd.concat(extra_scores, ignore_index=True).to_csv(out_dir / "extra_scores.csv", index=False)
+        pd.concat(extra_diffs, ignore_index=True).to_csv(out_dir / "extra_paired_differences.csv", index=False)
 
     if args.mastery:
         kappa, rho, _ = parse_name(best_skill)

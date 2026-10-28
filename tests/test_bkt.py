@@ -293,6 +293,23 @@ class TestPredictor:
         full = BKT(kappa=5.0).predict(hist, target_at(hist, 15))
         assert abs(p[0] - full[0]) < 0.2 and p[1:] == pytest.approx(full[1:], abs=0.05)
 
+    def test_missing_cells_are_not_counted_as_wrong_in_the_m_step(self):
+        # item 0 is right at every observed checkpoint; blanking three learned-phase cells
+        # must leave its fitted slip where it was, while zero-filling them must raise it
+        rng = np.random.default_rng(1)
+        N, T = 40, 16
+        z = (np.arange(T) >= 4).astype(float)
+        Y = (rng.random((N, T)) < np.where(z[None, :] == 1, 0.85, 0.25)).astype(float)
+        Y[0] = 1.0
+        holed, zeroed = Y.copy(), Y.copy()
+        holed[0, 8:11] = np.nan
+        zeroed[0, 8:11] = 0.0
+        slip_full = fit_skill(Y, kappa=1.0, rho=1.0).slip[0]
+        slip_holed = fit_skill(holed, kappa=1.0, rho=1.0).slip[0]
+        slip_zeroed = fit_skill(zeroed, kappa=1.0, rho=1.0).slip[0]
+        assert slip_holed == pytest.approx(slip_full, abs=0.02)
+        assert slip_zeroed > slip_holed + 0.05
+
     def test_cache_warm_start_close_to_cold_and_resets(self, world):
         _, hist, _, _ = world
         target = target_at(hist, 15)

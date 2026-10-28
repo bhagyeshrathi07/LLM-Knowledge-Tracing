@@ -60,11 +60,20 @@ Trivial predictors in `src/llm_kt/baselines.py`: `global_mean`, `skill_mean`, `i
 `scripts/run_models.py` scores the learner models with the same harness: static IRT persistence, T-SKIRT, DriftIRT, BKT (`src/llm_kt/bkt.py`, a per-skill two-state model with one transition per checkpoint, batched log-space emissions and per-item guess/slip shrunk toward an anchor). Learner models run on MMLU only; the other benchmarks stay for the ladder, transfer tests and controls.
 
 ```bash
+# the h = 1 grid as run on 2026-10-27 (about 10 min per setting; split --kappa / --anchor over
+# several processes with different --tag values and concatenate into models_bkt_grid_h1.parquet)
 python scripts/run_models.py --models olmo2-7b --benchmarks mmlu \
-    --predictors bkt item_mean skill_mean --kappa 1 5 20 100 1e6 --rho 1.0 0.9 0.7 \
-    --anchor skill fluid --horizon 1 --tag bkt_grid
+    --predictors bkt item_mean skill_mean --kappa 0.03 0.1 0.3 1 5 20 100 1e6 --rho 1.0 0.9 0.7 \
+    --anchor skill fluid --theta-lo -1 -2 --theta-hi 1 2 --horizon 1 --tag bkt_grid
+# the selected settings further ahead (models_bkt_best_h{5,20}.parquet; about 70 min per setting at h = 20)
+for h in 5 20; do
+  python scripts/run_models.py --models olmo2-7b --benchmarks mmlu --predictors bkt item_mean skill_mean \
+      --anchor skill --kappa 0.1 1 1e6 --rho 0.9 --horizon $h --tag bkt_bestS
+  python scripts/run_models.py --models olmo2-7b --benchmarks mmlu --predictors bkt \
+      --anchor fluid --theta-lo -2 --theta-hi 1 --kappa 1 --rho 0.9 --horizon $h --tag bkt_bestF
+done   # then concatenate bkt_bestS and bkt_bestF into models_bkt_best_h{5,20}.parquet
 python scripts/run_models.py --models olmo2-7b --benchmarks mmlu \
-    --predictors item_mean_ewma --rho 0.9 --horizon 1 --tag bkt_ewma   # recency-weighted item mean, the control
+    --predictors item_mean_ewma --rho 0.9 --horizon 1 --tag bkt_ewma   # recency-weighted item mean, the control (also at --horizon 5 and 20)
 python scripts/analyze_bkt.py --mastery   # selects on validation, compares with item mean and the control, plots mastery
 ```
 

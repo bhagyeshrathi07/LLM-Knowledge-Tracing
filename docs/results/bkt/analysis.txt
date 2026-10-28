@@ -168,6 +168,66 @@ val    log_loss -0.0066  0.0033 -0.0116   0.0004      1083
 test   log_loss -0.0070  0.0043 -0.0126   0.0023      1083
        auc      -0.0008  0.0007 -0.0023   0.0000      1083
 
+h=1, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k1_r0.9_fluid_lo-2_hi1  1291864    0.3877       0.0152  0.8820  0.0064
+       item_mean_ewma_r0.9         1291864    0.4025       0.0106  0.8802  0.0049
+val    bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3311       0.0163  0.9226  0.0056
+       item_mean_ewma_r0.9          266798    0.3324       0.0133  0.9269  0.0045
+test   bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3163       0.0224  0.9294  0.0070
+       item_mean_ewma_r0.9          266798    0.3165       0.0186  0.9334  0.0056
+
+h=1, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus item_mean_ewma_r0.9
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0148  0.0047 -0.0230  -0.0053      5244
+       auc       0.0019  0.0017 -0.0019   0.0045      5244
+val    log_loss -0.0013  0.0040 -0.0084   0.0072      1083
+       auc      -0.0043  0.0019 -0.0086  -0.0015      1083
+test   log_loss -0.0002  0.0045 -0.0084   0.0088      1083
+       auc      -0.0041  0.0015 -0.0074  -0.0019      1083
+
+h=1, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k0.1_r0.9_skill         1291864    0.4106       0.0140  0.8799  0.0053
+       bkt_k1_r0.9_fluid_lo-2_hi1  1291864    0.3877       0.0150  0.8820  0.0062
+val    bkt_k0.1_r0.9_skill          266798    0.3258       0.0159  0.9254  0.0050
+       bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3311       0.0164  0.9226  0.0056
+test   bkt_k0.1_r0.9_skill          266798    0.3095       0.0228  0.9327  0.0063
+       bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3163       0.0219  0.9294  0.0066
+
+h=1, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus bkt_k0.1_r0.9_skill
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0229  0.0024 -0.0271  -0.0188      5244
+       auc       0.0022  0.0014 -0.0006   0.0043      5244
+val    log_loss  0.0053  0.0022  0.0017   0.0097      1083
+       auc      -0.0028  0.0013 -0.0054  -0.0010      1083
+test   log_loss  0.0067  0.0028  0.0023   0.0133      1083
+       auc      -0.0033  0.0011 -0.0056  -0.0014      1083
+
+h=1, best skill-anchored with rho = 1 vs item_mean (bkt_k0.3_r1_skill vs item_mean): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                        
+pooled bkt_k0.3_r1_skill  1291864    0.4517       0.0127  0.8622  0.0059
+       item_mean          1291864    0.4569       0.0070  0.8620  0.0051
+val    bkt_k0.3_r1_skill   266798    0.3702       0.0150  0.9097  0.0060
+       item_mean           266798    0.3859       0.0100  0.9116  0.0047
+test   bkt_k0.3_r1_skill   266798    0.3613       0.0188  0.9148  0.0066
+       item_mean           266798    0.3747       0.0145  0.9157  0.0057
+
+h=1, best skill-anchored with rho = 1 vs item_mean (bkt_k0.3_r1_skill vs item_mean): paired difference, bkt_k0.3_r1_skill minus item_mean
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0052  0.0056 -0.0144   0.0064      5244
+       auc       0.0002  0.0011 -0.0027   0.0019      5244
+val    log_loss -0.0157  0.0059 -0.0262  -0.0040      1083
+       auc      -0.0019  0.0021 -0.0072   0.0011      1083
+test   log_loss -0.0134  0.0045 -0.0212  -0.0046      1083
+       auc      -0.0010  0.0014 -0.0047   0.0011      1083
+
 h=5, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
                                   n  log_loss  log_loss_se     auc  auc_se
 scope  predictor                                                          
@@ -231,6 +291,38 @@ pooled log_loss  0.0200  0.0026  0.0162   0.0262      5016
        auc      -0.0000  0.0006 -0.0014   0.0007      5016
 test   log_loss -0.0021  0.0048 -0.0085   0.0081      1083
        auc      -0.0010  0.0009 -0.0030   0.0000      1083
+
+h=5, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k1_r0.9_fluid_lo-2_hi1  1235696    0.4048       0.0142  0.8763  0.0065
+       item_mean_ewma_r0.9         1235696    0.4301       0.0086  0.8683  0.0050
+test   bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3258       0.0206  0.9254  0.0067
+       item_mean_ewma_r0.9          266798    0.3255       0.0176  0.9290  0.0054
+
+h=5, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus item_mean_ewma_r0.9
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0253  0.0056 -0.0350  -0.0139      5016
+       auc       0.0080  0.0018  0.0038   0.0107      5016
+test   log_loss  0.0004  0.0038 -0.0065   0.0084      1083
+       auc      -0.0036  0.0014 -0.0067  -0.0014      1083
+
+h=5, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k0.1_r0.9_skill         1235696    0.4502       0.0110  0.8683  0.0054
+       bkt_k1_r0.9_fluid_lo-2_hi1  1235696    0.4048       0.0140  0.8763  0.0063
+test   bkt_k0.1_r0.9_skill          266798    0.3234       0.0221  0.9280  0.0063
+       bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3258       0.0203  0.9254  0.0063
+
+h=5, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus bkt_k0.1_r0.9_skill
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0453  0.0041 -0.0527  -0.0377      5016
+       auc       0.0081  0.0013  0.0052   0.0103      5016
+test   log_loss  0.0025  0.0033 -0.0026   0.0095      1083
+       auc      -0.0026  0.0010 -0.0047  -0.0010      1083
 
 h=20, best skill-anchored (bkt_k0.1_r0.9_skill) vs item_mean: scores, cluster-bootstrap SEs over skills (n_boot=200)
                                   n  log_loss  log_loss_se     auc  auc_se
@@ -296,62 +388,94 @@ pooled log_loss  0.0381  0.0040  0.0317   0.0477      4161
 test   log_loss  0.0031  0.0035 -0.0020   0.0112      1083
        auc      -0.0007  0.0005 -0.0019  -0.0001      1083
 
-Wrote /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_mastery_olmo2-7b_k1e+06_r1.png and the mastery / skill-parameter CSVs under /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/results/bkt
-                              skill  n_items  pi  learn  forget  guess_s  slip_s  n_iter
-                   security_studies      245 0.1 0.2333  0.0119   0.3148  0.3536       3
-                          nutrition      306 0.1 0.1907  0.0121   0.3277  0.3821       3
-                 clinical_knowledge      265 0.1 0.1907  0.0121   0.3022  0.4118       4
-                        human_aging      223 0.1 0.1684  0.0077   0.3395  0.3691       3
-                           virology      166 0.1 0.1550  0.0002   0.2887  0.5490      11
-              professional_medicine      272 0.1 0.1410  0.0472   0.3789  0.4688       5
-                   college_medicine      173 0.1 0.1376  0.0002   0.2304  0.4777       7
-           college_computer_science      100 0.1 0.1375  0.0002   0.2700  0.5697      13
-                          sociology      201 0.1 0.1375  0.0002   0.2800  0.2198       3
-high_school_government_and_politics      193 0.1 0.1375  0.0002   0.2435  0.2049       3
-             high_school_psychology      545 0.1 0.1375  0.0002   0.2377  0.2403       3
-              high_school_geography      198 0.1 0.1375  0.0002   0.2295  0.3003       3
-                          astronomy      152 0.1 0.1375  0.0002   0.2275  0.3982       5
-                     moral_disputes      346 0.1 0.1375  0.0002   0.2733  0.3872       4
-                   medical_genetics      100 0.1 0.1375  0.0002   0.3000  0.3519       3
-             electrical_engineering      145 0.1 0.1375  0.0002   0.2916  0.4712       5
-                  us_foreign_policy      100 0.1 0.1374  0.0002   0.2874  0.2071       3
-                            anatomy      135 0.1 0.1371  0.0002   0.2344  0.4921       6
-                  computer_security      100 0.1 0.1360  0.0002   0.2797  0.3200       3
-                   public_relations      110 0.1 0.1244  0.0002   0.3179  0.3952       3
-                  international_law      121 0.1 0.1226  0.0002   0.3032  0.3194       4
-                         philosophy      311 0.1 0.1222  0.0002   0.2874  0.3402       3
-                      miscellaneous      783 0.1 0.1222  0.0002   0.3014  0.2543       5
-       high_school_european_history      165 0.1 0.1222  0.0002   0.2742  0.3152       3
-                          marketing      234 0.1 0.1222  0.0002   0.3018  0.2189       4
-          high_school_world_history      237 0.1 0.1222  0.0002   0.2932  0.2758       3
-                         prehistory      324 0.1 0.1222  0.0002   0.2940  0.3577       3
-                    human_sexuality      131 0.1 0.1221  0.0002   0.3065  0.3216       3
-                    world_religions      171 0.1 0.1188  0.0002   0.3420  0.2268       4
-              high_school_chemistry      203 0.1 0.1101  0.0003   0.2426  0.5479      11
-                      jurisprudence      108 0.1 0.1100  0.0002   0.3281  0.3372       3
-                high_school_biology      310 0.1 0.1100  0.0002   0.2860  0.3348       3
-         high_school_microeconomics      238 0.1 0.1100  0.0002   0.2638  0.4213       5
-                  logical_fallacies      163 0.1 0.1100  0.0002   0.2699  0.3466       3
-                         management      103 0.1 0.1100  0.0002   0.2956  0.2547       4
-                    business_ethics      100 0.1 0.0923  0.0002   0.3256  0.4313       3
-             high_school_us_history      204 0.1 0.0916  0.0002   0.3405  0.2796       6
-            professional_psychology      612 0.1 0.0916  0.0002   0.3064  0.4300       5
-       high_school_computer_science      100 0.1 0.0912  0.0002   0.3044  0.4585       6
-                    college_biology      144 0.1 0.0850  0.0002   0.3118  0.3716       3
-         high_school_macroeconomics      390 0.1 0.0847  0.0003   0.3064  0.4534       6
-             high_school_statistics      216 0.1 0.0552  0.0061   0.3317  0.5638      11
-                 conceptual_physics      235 0.1 0.0479  0.0003   0.3656  0.4923       6
-                  college_chemistry      100 0.1 0.0451  0.0003   0.2859  0.5965       9
-                   machine_learning      112 0.1 0.0378  0.0003   0.3393  0.5732       9
-                    college_physics      102 0.1 0.0011  0.0200   0.3104  0.3000       3
-                       formal_logic      126 0.1 0.0011  0.0200   0.3211  0.3000       3
-                college_mathematics      100 0.1 0.0011  0.0200   0.3316  0.3000       3
-                       global_facts      100 0.1 0.0011  0.0200   0.3452  0.3000       3
-                   abstract_algebra      100 0.1 0.0011  0.0200   0.2869  0.3000       3
-                    moral_scenarios      895 0.1 0.0011  0.0200   0.2638  0.3000       3
-            high_school_mathematics      270 0.1 0.0011  0.0200   0.2867  0.3000       3
-                   professional_law     1534 0.1 0.0011  0.0200   0.3937  0.3000       3
-             elementary_mathematics      378 0.1 0.0011  0.0200   0.3289  0.3000       3
-                high_school_physics      151 0.1 0.0011  0.0200   0.3350  0.3000       3
-                       econometrics      114 0.1 0.0011  0.0200   0.3198  0.3000       3
-            professional_accounting      282 0.1 0.0011  0.0200   0.3766  0.3000       3
+h=20, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k1_r0.9_fluid_lo-2_hi1  1025066    0.4362       0.0143  0.8653  0.0075
+       item_mean_ewma_r0.9         1025066    0.4869       0.0063  0.8441  0.0053
+test   bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3561       0.0195  0.9120  0.0070
+       item_mean_ewma_r0.9          266798    0.3554       0.0167  0.9144  0.0059
+
+h=20, best Fluid-anchored vs recency control (bkt_k1_r0.9_fluid_lo-2_hi1 vs item_mean_ewma_r0.9): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus item_mean_ewma_r0.9
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0507  0.0083 -0.0649  -0.0339      4161
+       auc       0.0213  0.0023  0.0156   0.0246      4161
+test   log_loss  0.0007  0.0035 -0.0056   0.0079      1083
+       auc      -0.0024  0.0016 -0.0060   0.0002      1083
+
+h=20, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): scores, cluster-bootstrap SEs over skills (n_boot=200)
+                                         n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                 
+pooled bkt_k0.1_r0.9_skill         1025066    0.5250       0.0102  0.8442  0.0059
+       bkt_k1_r0.9_fluid_lo-2_hi1  1025066    0.4362       0.0142  0.8653  0.0072
+test   bkt_k0.1_r0.9_skill          266798    0.3585       0.0198  0.9137  0.0062
+       bkt_k1_r0.9_fluid_lo-2_hi1   266798    0.3561       0.0195  0.9120  0.0069
+
+h=20, best Fluid-anchored vs best skill-anchored (bkt_k1_r0.9_fluid_lo-2_hi1 vs bkt_k0.1_r0.9_skill): paired difference, bkt_k1_r0.9_fluid_lo-2_hi1 minus bkt_k0.1_r0.9_skill
+                   diff      se  ci_low  ci_high  n_slices
+scope  metric                                             
+pooled log_loss -0.0888  0.0062 -0.1007  -0.0771      4161
+       auc       0.0212  0.0018  0.0169   0.0239      4161
+test   log_loss -0.0024  0.0021 -0.0058   0.0015      1083
+       auc      -0.0017  0.0013 -0.0044   0.0005      1083
+
+Wrote /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/figures/bkt_mastery_olmo2-7b.png and the mastery / skill-parameter CSVs under /Users/bhagyeshrathi/Desktop/MastersProject/LLM-Knowledge-Tracing/docs/results/bkt
+                              skill  n_items     pi  learn  forget  guess_s  slip_s  n_iter
+                  college_chemistry      100 0.6000 0.8564  0.0629   0.3250  0.6250      13
+           college_computer_science      100 0.6000 0.7891  0.0901   0.3722  0.5778      50
+             high_school_statistics      216 0.1000 0.7691  0.0605   0.3205  0.5856       9
+              high_school_chemistry      203 0.1000 0.6833  0.0339   0.2315  0.5567       6
+                   abstract_algebra      100 0.1003 0.6727  0.0604   0.2392  0.7108      17
+                   machine_learning      112 0.1000 0.5831  0.0532   0.3135  0.5906       6
+                       formal_logic      126 0.6000 0.5094  0.1481   0.2597  0.6617      14
+                           virology      166 0.6000 0.4763  0.0377   0.3897  0.5603      11
+                   professional_law     1534 0.1000 0.4200  0.0113   0.2515  0.6000       7
+              professional_medicine      272 0.1000 0.3262  0.3527   0.4287  0.4514      32
+                       econometrics      114 0.6000 0.2764  0.0112   0.2705  0.6795      16
+                          astronomy      152 0.1000 0.2583  0.0243   0.3122  0.3914       4
+                 clinical_knowledge      265 0.1000 0.1909  0.0121   0.3022  0.4118       4
+              high_school_geography      198 0.1000 0.1840  0.0258   0.4078  0.2832      13
+          high_school_world_history      237 0.1000 0.1742  0.0123   0.3711  0.2703       4
+                    college_biology      144 0.1000 0.1726  0.0285   0.3703  0.3607       9
+                        human_aging      223 0.1000 0.1615  0.0124   0.3763  0.3649       5
+                   security_studies      245 0.1000 0.1615  0.0124   0.3789  0.3468       4
+                  international_law      121 0.1000 0.1474  0.0126   0.4081  0.3120       8
+                          nutrition      306 0.1000 0.1400  0.0127   0.3767  0.3761       4
+             electrical_engineering      145 0.1000 0.1375  0.0002   0.2916  0.4712       5
+                  computer_security      100 0.1000 0.1221  0.0002   0.3041  0.3180       4
+high_school_government_and_politics      193 0.1000 0.1167  0.0132   0.4693  0.1831       6
+                            anatomy      135 0.1000 0.1100  0.0002   0.2724  0.4897       4
+                          marketing      234 0.1000 0.1100  0.0002   0.3343  0.2167       4
+                   college_medicine      173 0.1000 0.1100  0.0002   0.2659  0.4746       5
+                         philosophy      311 0.1000 0.1100  0.0002   0.3133  0.3386       5
+                   public_relations      110 0.1000 0.1000  0.0002   0.3554  0.3923       4
+                         management      103 0.1000 0.1000  0.0002   0.3213  0.2524       4
+                          sociology      201 0.1000 0.1000  0.0002   0.3686  0.2125       4
+                    moral_scenarios      895 0.6000 0.1000  0.0002   0.2138  0.7362      50
+                    world_religions      171 0.1000 0.1000  0.0002   0.3871  0.2232       5
+                    business_ethics      100 0.1000 0.0960  0.0003   0.3218  0.4321       4
+       high_school_european_history      165 0.1000 0.0917  0.0002   0.3519  0.3107       6
+                    human_sexuality      131 0.1000 0.0917  0.0002   0.3636  0.3157       4
+                  us_foreign_policy      100 0.1000 0.0912  0.0014   0.4397  0.1982       7
+       high_school_computer_science      100 0.1000 0.0860  0.0005   0.3160  0.4574      14
+                   medical_genetics      100 0.1000 0.0851  0.0003   0.3956  0.3448       7
+         high_school_macroeconomics      390 0.1000 0.0851  0.0003   0.3063  0.4534       4
+         high_school_microeconomics      238 0.1000 0.0847  0.0003   0.3092  0.4164       7
+                      jurisprudence      108 0.1000 0.0846  0.0002   0.3772  0.3321       5
+             high_school_psychology      545 0.1000 0.0846  0.0002   0.3806  0.2294       5
+            professional_psychology      612 0.1000 0.0846  0.0002   0.3177  0.4285       4
+                         prehistory      324 0.1000 0.0846  0.0002   0.3670  0.3514       4
+                high_school_biology      310 0.1000 0.0786  0.0002   0.3565  0.3274       6
+                      miscellaneous      783 0.1000 0.0786  0.0002   0.4148  0.2451       7
+                     moral_disputes      346 0.1000 0.0786  0.0002   0.3777  0.3788       6
+                  logical_fallacies      163 0.1000 0.0647  0.0003   0.3807  0.3349       9
+                 conceptual_physics      235 0.1000 0.0616  0.0003   0.3493  0.4981       7
+             high_school_us_history      204 0.1000 0.0522  0.0003   0.4584  0.2650      10
+            high_school_mathematics      270 0.1000 0.0011  0.0200   0.2867  0.3001       3
+                college_mathematics      100 0.1000 0.0011  0.0200   0.3316  0.3000       3
+                    college_physics      102 0.1000 0.0011  0.0200   0.3104  0.3000       4
+                high_school_physics      151 0.1000 0.0011  0.0200   0.3350  0.3000       3
+                       global_facts      100 0.1000 0.0011  0.0200   0.3452  0.3000       3
+            professional_accounting      282 0.1000 0.0011  0.0200   0.3766  0.3000       3
+             elementary_mathematics      378 0.1000 0.0011  0.0200   0.3289  0.3000       3
