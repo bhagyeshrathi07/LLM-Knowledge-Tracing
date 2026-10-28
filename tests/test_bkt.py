@@ -2,7 +2,16 @@ import numpy as np
 import pytest
 from scipy.special import logsumexp
 
-from llm_kt.bkt import batch_log_emissions, log_forward_backward
+from llm_kt.bkt import (
+    COLD_START,
+    EPS,
+    SkillParams,
+    batch_log_emissions,
+    clip_guess,
+    fit_skill,
+    forecast_state,
+    log_forward_backward,
+)
 
 
 def brute_force(log_pi, log_A, log_emit):
@@ -59,3 +68,78 @@ class TestForwardBackward:
         assert np.all(np.isfinite(le))
         assert le[1, 0] == pytest.approx(np.log(0.5))  # only item 1 observed at t=1
         assert le[1, 1] == pytest.approx(np.log(0.5))
+
+
+def simulate_skill(rng, N, T, pi, learn, forget, guess, slip):
+    z = np.zeros(T, dtype=int)
+    z[0] = rng.random() < pi
+    for t in range(1, T):
+        z[t] = (rng.random() < learn) if z[t - 1] == 0 else (rng.random() >= forget)
+    p = np.where(z[None, :] == 1, 1 - slip[:, None], guess[:, None])
+    return (rng.random((N, T)) < p).astype(float), z
+
+
+class TestHelpers:
+    def test_clip_guess_keeps_learned_state_better(self):
+        g = clip_guess(np.array([0.9, 0.2, 0.0]), np.array([0.3, 0.3, 0.3]))
+        assert g == pytest.approx([0.65, 0.2, 1e-6])
+
+    def test_forecast_state_moves_toward_stationary(self):
+        learn, forget = 0.1, 0.05
+        stat = learn / (learn + forget)
+        p = [forecast_state(0.0, learn, forget, h) for h in (1, 5, 20)]
+        assert p[0] == pytest.approx(0.1) and p[0] < p[1] < p[2] < stat
+        assert forecast_state(1.0, learn, forget, 1) == pytest.approx(0.95)
+
+    def test_cold_start_values(self):
+        assert COLD_START == {"pi": 0.2, "learn": 0.1, "forget": 0.02, "guess_s": 0.25, "slip_s": 0.3}
+
+
+class TestFitSkill:
+    def test_recovers_parameters_in_per_skill_limit(self):
+        rng = np.random.default_rng(2)
+        N, T = 400, 300
+        Y, _ = simulate_skill(rng, N, T, 0.1, 0.08, 0.01, np.full(N, 0.25), np.full(N, 0.2))
+        fp = fit_skill(Y, kappa=1e6, rho=1.0)
+        assert isinstance(fp, SkillParams)
+        assert fp.learn == pytest.approx(0.08, abs=0.03)
+        assert fp.forget == pytest.approx(0.01, abs=0.015)
+        assert fp.guess_s == pytest.approx(0.25, abs=0.03)
+        assert fp.slip_s == pytest.approx(0.2, abs=0.03)
+        assert np.ptp(fp.guess) < 1e-3 and np.ptp(fp.slip) < 1e-3  # items sit at the anchor
+        assert 1 <= fp.n_iter <= 50 and np.isfinite(fp.loglik)
+
+    def test_small_kappa_lets_items_move_and_rho_weights_recent(self):
+        rng = np.random.default_rng(3)
+        N, T = 60, 30
+        Y, _ = simulate_skill(rng, N, T, 0.9, 0.1, 0.0, np.full(N, 0.25), np.full(N, 0.2))
+        Y[0] = 1.0  # always right
+        Y[1] = 0.0  # always wrong
+        Y[2] = np.r_[np.zeros(T - 3), np.ones(3)]  # wrong, then right for the last 3
+        fixed = fit_skill(Y, kappa=1.0, rho=1.0)
+        recent = fit_skill(Y, kappa=1.0, rho=0.7)
+        assert 1 - fixed.slip[0] > 0.9 and 1 - fixed.slip[1] < 0.1
+        assert 1 - recent.slip[2] > 1 - fixed.slip[2] + 0.2
+
+    def test_fluid_anchor_arrays_are_used(self):
+        rng = np.random.default_rng(4)
+        N, T = 50, 20
+        Y, _ = simulate_skill(rng, N, T, 0.5, 0.1, 0.01, np.full(N, 0.3), np.full(N, 0.2))
+        ag, asl = np.linspace(0.05, 0.4, N), np.linspace(0.1, 0.5, N)
+        fp = fit_skill(Y, kappa=1e6, rho=1.0, anchor_guess=ag, anchor_slip=asl)
+        assert fp.guess == pytest.approx(clip_guess(ag, asl), abs=1e-3)
+        assert fp.slip == pytest.approx(asl, abs=1e-3)
+
+    def test_degenerate_all_correct_skill_is_finite(self):
+        fp = fit_skill(np.ones((30, 2)), kappa=5.0, rho=1.0)
+        for v in (fp.pi, fp.learn, fp.forget, fp.guess_s, fp.slip_s):
+            assert np.isfinite(v) and EPS <= v <= 1 - EPS
+        assert np.all(np.isfinite(fp.guess)) and np.all(np.isfinite(fp.slip))
+
+    def test_warm_start_from_init_converges_in_fewer_iterations(self):
+        rng = np.random.default_rng(5)
+        Y, _ = simulate_skill(rng, 200, 40, 0.1, 0.1, 0.02, np.full(200, 0.25), np.full(200, 0.2))
+        cold = fit_skill(Y, kappa=5.0, rho=1.0)
+        warm = fit_skill(Y, kappa=5.0, rho=1.0, init=cold)
+        assert warm.n_iter < cold.n_iter
+        assert warm.learn == pytest.approx(cold.learn, abs=1e-3)
