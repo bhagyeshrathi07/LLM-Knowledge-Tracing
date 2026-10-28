@@ -57,13 +57,15 @@ Trivial predictors in `src/llm_kt/baselines.py`: `global_mean`, `skill_mean`, `i
 
 ## Learner models
 
-`scripts/run_models.py` scores the learner models with the same harness: static IRT persistence, T-SKIRT, DriftIRT and BKT (`src/llm_kt/bkt.py`, a per-skill two-state model with one transition per checkpoint, batched log-space emissions and per-item guess/slip shrunk toward an anchor). Learner models run on MMLU only; the other benchmarks stay for the ladder, transfer tests and controls.
+`scripts/run_models.py` scores the learner models with the same harness: static IRT persistence, T-SKIRT, DriftIRT, BKT (`src/llm_kt/bkt.py`, a per-skill two-state model with one transition per checkpoint, batched log-space emissions and per-item guess/slip shrunk toward an anchor). Learner models run on MMLU only; the other benchmarks stay for the ladder, transfer tests and controls.
 
 ```bash
 python scripts/run_models.py --models olmo2-7b --benchmarks mmlu \
     --predictors bkt item_mean skill_mean --kappa 1 5 20 100 1e6 --rho 1.0 0.9 0.7 \
     --anchor skill fluid --horizon 1 --tag bkt_grid
-python scripts/analyze_bkt.py --mastery   # selects on validation, compares with item mean, plots mastery
+python scripts/run_models.py --models olmo2-7b --benchmarks mmlu \
+    --predictors item_mean_ewma --rho 0.9 --horizon 1 --tag bkt_ewma   # recency-weighted item mean, the control
+python scripts/analyze_bkt.py --mastery   # selects on validation, compares with item mean and the control, plots mastery
 ```
 
 ## Tests

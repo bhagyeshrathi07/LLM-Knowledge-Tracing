@@ -3,7 +3,7 @@
 
 Usage:
     python scripts/analyze_bkt.py [--grid models_bkt_grid_h1.parquet] [--horizon-tag bkt_best]
-                                  [--mastery] [--kappa K --rho R]
+                                  [--ewma-tag bkt_ewma] [--mastery] [--kappa K --rho R]
 
 Reads the h=1 grid written by run_models.py (BKT settings plus item_mean and skill_mean on
 identical rows). Three predictors are singled out: the best skill-anchored setting and the best
@@ -13,10 +13,15 @@ skill. For each, pooled / validation / test log-loss and AUC with skill-clustere
 (n_boot=200) and paired differences against item_mean with 95% intervals; the per-skill limit
 is also paired against skill_mean. When models_<horizon-tag>_h{5,20}.parquet exist, the same
 comparison is repeated on their test block. Only the validation block is used for selection.
+When models_<ewma-tag>_h{1,5,20}.parquet exist (run_models.py --predictors item_mean_ewma
+--rho R), the best skill-anchored setting is also paired against the recency-weighted item
+mean with the same rho: the control that says whether BKT's gain over item_mean is more than
+recency weighting alone.
 
 --mastery fits the selected skill-anchored setting once on the full OLMo-2 MMLU history and
 writes the mastery and skill-parameter CSVs and the figure docs/figures/bkt_mastery_olmo2-7b.png
-(per-subject P(learned) over training; learn vs forget).
+(per-subject P(learned) over training; learn vs forget). With --kappa / --rho the fit uses
+that setting instead and the figure and CSVs carry a _k<kappa>_r<rho> suffix.
 
 Everything printed is also stored under --out-dir (default docs/results/bkt, committed, unlike
 data/processed): validation_table.csv, h{1,5,20}_scores.csv, h{1,5,20}_paired_differences.csv,
@@ -67,6 +72,22 @@ def parse_name(name: str) -> tuple[float, float, str]:
     if not m:
         raise ValueError(f"not a BKT predictor name: {name!r}")
     return float(m.group(1)), float(m.group(2)), m.group(3)
+
+
+def ewma_name(bkt_name: str) -> str:
+    """The recency-weighted item mean with the same rho as a BKT setting (its control)."""
+    _, rho, _ = parse_name(bkt_name)
+    return f"item_mean_ewma_r{rho:g}"
+
+
+def _with_control(df: pd.DataFrame, path: Path) -> pd.DataFrame:
+    """Append the item_mean_ewma rows from `path` when it exists; otherwise return df."""
+    if not path.exists():
+        print(f"(no {path.name}; recency control not compared)")
+        return df
+    extra = pd.read_parquet(path)
+    extra = extra[~extra["predictor"].isin(set(df["predictor"]))]
+    return pd.concat([df, extra], ignore_index=True)
 
 
 def load_grid(path: Path) -> pd.DataFrame:
@@ -222,6 +243,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--grid", default="models_bkt_grid_h1.parquet")
     parser.add_argument("--horizon-tag", default="bkt_best")
+    parser.add_argument("--ewma-tag", default="bkt_ewma",
+                        help="tag of the item_mean_ewma runs used as the recency control")
     parser.add_argument("--mastery", action="store_true", help="fit the selected setting on the full history and plot")
     parser.add_argument("--kappa", type=float, default=None, help="override kappa for the mastery fit")
     parser.add_argument("--rho", type=float, default=None, help="override rho for the mastery fit")
@@ -236,6 +259,7 @@ def main() -> None:
     diffs: dict[int, list] = {1: [], 5: [], 20: []}
 
     df = load_grid(PROC / args.grid)
+    df = _with_control(df, PROC / f"models_{args.ewma_tag}_h1.parquet")
     val = summarize(df[df["block"] == "val"], by=["predictor"]).sort_values("log_loss")
     print("Validation block, every predictor (lower log_loss better)")
     print(val.set_index("predictor")[["n", "log_loss", "brier", "accuracy", "auc"]].round(4).to_string())
@@ -253,19 +277,29 @@ def main() -> None:
         t, d = report(df, LIMIT, SKILL_MEAN, f"h=1, per-skill limit ({LIMIT}) vs skill_mean")
         scores[1].append(t)
         diffs[1].append(d)
+    control = ewma_name(best_skill)
+    if control in set(df["predictor"]):
+        t, d = report(df, best_skill, control, f"h=1, best skill-anchored ({best_skill}) vs {control}")
+        scores[1].append(t)
+        diffs[1].append(d)
 
     for h in (5, 20):
         path = PROC / f"models_{args.horizon_tag}_h{h}.parquet"
         if not path.exists():
             print(f"\n(no {path.name}; skipping h={h})")
             continue
-        hdf = pd.read_parquet(path)
+        hdf = _with_control(pd.read_parquet(path), PROC / f"models_{args.ewma_tag}_h{h}.parquet")
         for name, label in chosen:
             if name is not None and name in set(hdf["predictor"]):
                 t, d = report(hdf, name, ITEM_MEAN, f"h={h}, {label} ({name}) vs item_mean",
                               scopes=("pooled", "test"))
                 scores[h].append(t)
                 diffs[h].append(d)
+        if control in set(hdf["predictor"]):
+            t, d = report(hdf, best_skill, control, f"h={h}, best skill-anchored ({best_skill}) vs {control}",
+                          scopes=("pooled", "test"))
+            scores[h].append(t)
+            diffs[h].append(d)
     for h in (1, 5, 20):
         if scores[h]:
             pd.concat(scores[h], ignore_index=True).to_csv(out_dir / f"h{h}_scores.csv", index=False)
@@ -276,10 +310,12 @@ def main() -> None:
         kappa, rho, _ = parse_name(best_skill)
         kappa = args.kappa if args.kappa is not None else kappa
         rho = args.rho if args.rho is not None else rho
+        # an overridden setting gets its own file names so the selected setting's files stay
+        suffix = "" if (args.kappa is None and args.rho is None) else f"_k{kappa:g}_r{rho:g}"
         mastery, params = fit_mastery(kappa, rho)
-        mastery.to_csv(out_dir / f"bkt_mastery_{FOCUS_MODEL}.csv", index=False)
-        params.to_csv(out_dir / f"bkt_skill_params_{FOCUS_MODEL}.csv", index=False)
-        out = FIG_DIR / f"bkt_mastery_{FOCUS_MODEL}.png"
+        mastery.to_csv(out_dir / f"bkt_mastery_{FOCUS_MODEL}{suffix}.csv", index=False)
+        params.to_csv(out_dir / f"bkt_skill_params_{FOCUS_MODEL}{suffix}.csv", index=False)
+        out = FIG_DIR / f"bkt_mastery_{FOCUS_MODEL}{suffix}.png"
         plot_mastery(mastery, params, out, f"kappa={kappa:g}, rho={rho:g}")
         print(f"\nWrote {out} and the mastery / skill-parameter CSVs under {out_dir}")
         print(params.sort_values("learn", ascending=False).round(4).to_string(index=False))

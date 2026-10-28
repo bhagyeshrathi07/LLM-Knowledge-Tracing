@@ -62,6 +62,33 @@ class ItemMean:
         return target["item_id"].map(p).fillna(prior).to_numpy()
 
 
+class ItemMeanEWMA:
+    """P = the item's recency-weighted accuracy, shrunk toward the global mean.
+
+    Each past checkpoint gets weight rho^(age), age = last checkpoint index minus its
+    own, so with rho = 1 this is ItemMean exactly and with rho < 1 recent answers count
+    more. Same `alpha` pseudo-observations at the history-wide accuracy as ItemMean.
+    The control for BKT's recency gain: BKT with tiny `kappa` and `rho < 1` has
+    per-item emissions that are this quantity split by state.
+    """
+
+    def __init__(self, rho: float = 0.9, alpha: float = 1.0):
+        if not 0 < rho <= 1:
+            raise ValueError("rho must be in (0, 1]")
+        self.rho = rho
+        self.alpha = alpha
+        self.name = f"item_mean_ewma_r{rho:g}"
+
+    def predict(self, history: pd.DataFrame, target: pd.DataFrame, horizon: int = 1) -> np.ndarray:
+        age = history["checkpoint_idx"].max() - history["checkpoint_idx"]
+        w = np.power(self.rho, age.to_numpy(dtype=float))
+        h = history.assign(_w=w, _wy=w * history["correct"].to_numpy(dtype=float))
+        g = h.groupby("item_id")[["_w", "_wy"]].sum()
+        prior = history["correct"].mean()
+        p = (g["_wy"] + self.alpha * prior) / (g["_w"] + self.alpha)
+        return target["item_id"].map(p).fillna(prior).to_numpy()
+
+
 class CopyLast:
     """P = the item's correctness at the most recent checkpoint, softened.
 

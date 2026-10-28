@@ -11,6 +11,8 @@ Usage:
     python scripts/run_models.py --predictors bkt item_mean skill_mean --kappa 1 5 20 100 1e6 \
         --rho 1.0 0.9 0.7 --anchor skill fluid --theta-lo -1 -2 --theta-hi 1 2 \
         --models olmo2-7b --benchmarks mmlu --tag bkt_grid
+    python scripts/run_models.py --predictors item_mean_ewma --rho 0.9 --horizon 1 \
+        --models olmo2-7b --benchmarks mmlu --tag bkt_ewma   # recency-weighted item mean control
 
 DriftIRT and BKT dials are given as lists; one predictor is built per combination. BKT
 combinations that give an identical predictor (theta values under the skill anchor, rho at
@@ -29,7 +31,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from llm_kt.baselines import ItemMean, SkillMean
+from llm_kt.baselines import ItemMean, ItemMeanEWMA, SkillMean
 from llm_kt.bkt import ANCHORS, BKT, KAPPA_LIMIT
 from llm_kt.drift_irt import RESIDUAL_SCALES, DriftIRT
 from llm_kt.evaluate import evaluate, summarize
@@ -47,7 +49,7 @@ def main() -> None:
     parser.add_argument("--models", nargs="+", default=list(MODELS), choices=MODELS)
     parser.add_argument("--benchmarks", nargs="+", default=None, help="restrict to these benchmarks (e.g. mmlu)")
     parser.add_argument("--predictors", nargs="+", default=["static_irt", "tskirt"],
-                        choices=["static_irt", "tskirt", "drift_irt", "bkt", "item_mean", "skill_mean"])
+                        choices=["static_irt", "tskirt", "drift_irt", "bkt", "item_mean", "item_mean_ewma", "skill_mean"])
     parser.add_argument("--nu", nargs="+", type=float, default=[0.1], help="T-SKIRT drift values to try")
     parser.add_argument("--window", type=int, default=1, help="static IRT: checkpoints used to fit theta")
     parser.add_argument("--time-col", default="checkpoint_idx", choices=["checkpoint_idx", "step", "tokens_seen_b"])
@@ -90,6 +92,8 @@ def main() -> None:
     predictors = []
     if "item_mean" in args.predictors:
         predictors.append(ItemMean())
+    if "item_mean_ewma" in args.predictors:
+        predictors += [ItemMeanEWMA(rho=rho) for rho in args.rho]
     if "skill_mean" in args.predictors:
         predictors.append(SkillMean())
     # one predictor per tau when recalibrating (names carry tau and tau_a); tau is unused otherwise
