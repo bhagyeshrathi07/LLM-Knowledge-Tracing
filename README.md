@@ -55,6 +55,17 @@ python scripts/run_baselines.py --horizon 1
 
 Trivial predictors in `src/llm_kt/baselines.py`: `global_mean`, `skill_mean`, `item_mean`, `copy_last`, `copy_last_calibrated`. The strongest is `item_mean` (pooled h=1: log-loss 0.360, within-skill AUC 0.80; MMLU only: 0.483 / 0.79). A learner model must beat it on the same benchmark subset and horizon to have learned something the raw data did not already say. AUC is computed within (model, checkpoint, skill) slices, so any predictor that is constant within a skill scores 0.50 by construction. To add a model, implement the `Predictor` protocol in `src/llm_kt/evaluate.py` (it receives the forecast `horizon`) and pass it to `evaluate()`. Results are written to `data/processed/baseline_results_h{horizon}.parquet`.
 
+## Learner models
+
+`scripts/run_models.py` scores the learner models with the same harness: static IRT persistence, T-SKIRT, DriftIRT and BKT (`src/llm_kt/bkt.py`, a per-skill two-state model with one transition per checkpoint, batched log-space emissions and per-item guess/slip shrunk toward an anchor). Learner models run on MMLU only; the other benchmarks stay for the ladder, transfer tests and controls.
+
+```bash
+python scripts/run_models.py --models olmo2-7b --benchmarks mmlu \
+    --predictors bkt item_mean skill_mean --kappa 1 5 20 100 1e6 --rho 1.0 0.9 0.7 \
+    --anchor skill fluid --horizon 1 --tag bkt_grid
+python scripts/analyze_bkt.py --mastery   # selects on validation, compares with item mean, plots mastery
+```
+
 ## Tests
 
 ```bash
