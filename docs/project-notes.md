@@ -312,6 +312,27 @@ Context: the primary models (BKT, temporal IRT) fit per skill. For a skill like 
 
 **Proposed: (iii), ablation only, leave-one-model-out split, clearly labeled.** Never for headline numbers. Headline numbers come from BKT and temporal IRT fit per skill on the real 6 learners. Needs team sign-off.
 
+### Decision 6: Which benchmarks feed the learner models? — ADOPTED 2026-10-27: MMLU only for headline results
+
+Context: the Fluid release carries five binary benchmarks (ARC-Challenge, GSM8K, HellaSwag, MMLU, WinoGrande). Only MMLU has skill labels (57 subjects). The advisor suggested not including HellaSwag and WinoGrande, because no specific skill can be assigned to their questions. All learner-model runs to date (`scripts/run_models.py --benchmarks mmlu`) have already been MMLU only; this decision makes that the rule rather than a convenience.
+
+**(i) All five benchmarks, one skill per non-MMLU benchmark.**
+- Pro: more data; a single run covers everything.
+- Con: a per-skill model on a benchmark with one skill reduces to one ability number plus per-item offsets, which is a benchmark score with extra steps, not knowledge tracing. Dilutes the claim and invites the question "what did KT add here?".
+- Con: ARC-Challenge also has no official skill tags; GSM8K is near floor for most models (§3), so there is little to trace.
+
+**(ii) MMLU only for learner models and headline results; other benchmarks retained in the data table for three narrow roles.**
+- Role 1, baseline ladder: the per-benchmark item gap (global vs skill vs item mean) is a finding about where predictability lives, not a KT-model result. Keep the one table (`scripts/analyze_ladder.py`).
+- Role 2, held-out transfer targets: the advisor's 2026-10-19 suggestion is to fit per-skill trajectories on one dataset and test whether they predict the same checkpoints' performance on another. HellaSwag and WinoGrande are useful here precisely because they sit outside the fitted skill set.
+- Role 3, single-skill controls: a DriftIRT or T-SKIRT run on one skill-less benchmark shows how much of a gain comes from recency alone, since the skill term is inert. Appendix material.
+- Pro: headline claim stays "per-skill mastery with uncertainty"; MMLU already strains skill quality (subjects are topics, §4 item 4), so adding skill-less benchmarks would worsen that.
+- Con: Phase 1 headline results rest on one benchmark and its subject labels. Phase 2 on MathCAMPS (real Common Core skill tags) is the fix.
+
+**(iii) Drop the non-MMLU benchmarks from the processed table.**
+- Con: kills Roles 1–3 and forces a re-ingest later; keeping 12.6M rows costs nothing.
+
+**Adopted: (ii).** Filter at the experiment level (the `--benchmarks` flag), never in `ingest.py` or the processed Parquet. Every write-up labels model results as "OLMo-2, MMLU" (or whichever model/benchmark slice) and keeps ARC, GSM8K, HellaSwag and WinoGrande to the ladder table, transfer tests and controls.
+
 ---
 
 ## 7. Next steps
