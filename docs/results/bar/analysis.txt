@@ -1,0 +1,500 @@
+Section 1: every learner model rescored against the recency-weighted item mean
+OLMo-2 7B, MMLU only. Blocks by target checkpoint: train 0-55, val 56-74, test 75-93. The learner
+settings were chosen on validation earlier (against item_mean for T-SKIRT and DriftIRT); they are
+rescored here, not re-tuned against the new bar.
+Look-ahead: every hyperparameter (rho, q, nu) was chosen on validation targets 56-74. At h=20 every
+test forecast originates at 55-73 and at h=5 the first four originate before 74, so tuning saw
+observations later than those forecast origins (test labels stay held out). The h=5 and h=20
+comparisons, paired ones included, are retrospective; h=1 is unaffected. Follow-up: select on
+targets up to 54 and test from 75.
+Readings: 'a better' / 'b better' when the 95% interval excludes zero, otherwise 'no demonstrated
+difference'. These are measurements, not explanations: why a model wins is not tested here.
+
+Validation block (checkpoints 56 to 74), horizon 1: item mean and the recency-weighted
+item mean for each rho (item_mean is rho = 1). SEs: cluster bootstrap over skills, n_boot=200.
+                       rho       n  log_loss  log_loss_se   brier  accuracy     auc  auc_se
+predictor                                                                                  
+item_mean_ewma_r0.9   0.90  266798    0.3324       0.0123  0.1031    0.8520  0.9269  0.0041
+item_mean_ewma_r0.95  0.95  266798    0.3352       0.0129  0.1047    0.8493  0.9256  0.0040
+item_mean_ewma_r0.8   0.80  266798    0.3502       0.0136  0.1067    0.8490  0.9238  0.0048
+item_mean_ewma_r0.99  0.99  266798    0.3693       0.0102  0.1151    0.8357  0.9164  0.0042
+item_mean_ewma_r0.7   0.70  266798    0.3705       0.0126  0.1121    0.8432  0.9196  0.0047
+item_mean             1.00  266798    0.3859       0.0097  0.1205    0.8284  0.9116  0.0045
+item_mean_ewma_r0.5   0.50  266798    0.4087       0.0120  0.1243    0.8204  0.9115  0.0056
+
+Chosen bar: item_mean_ewma_r0.9 (lowest validation log-loss)
+
+====================================================================================================
+Horizon 1
+====================================================================================================
+Row alignment on (model, origin_idx, target_idx, skill):
+                                              n_rows  n_kept  n_dropped  dropped_origin_min  dropped_origin_max
+predictor                                                                                                      
+bkt_k0.1_r0.9_skill                             5244    5244          0                 NaN                 NaN
+bkt_k1_r0.9_fluid_lo-2_hi1                      5244    5244          0                 NaN                 NaN
+copy_last                                       5244    5244          0                 NaN                 NaN
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres            5244    5244          0                 NaN                 NaN
+item_mean                                       5244    5244          0                 NaN                 NaN
+item_mean_ewma_r0.9                             5244    5244          0                 NaN                 NaN
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5    5244    5244          0                 NaN                 NaN
+Identical row sets for every predictor; nothing dropped.
+
+h=1 scores (cluster-bootstrap SEs over skills, n_boot=200)
+                                                           n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                                   
+pooled copy_last                                     1291864    0.5729       0.0203  0.7634  0.0057
+       item_mean                                     1291864    0.4569       0.0067  0.8620  0.0047
+       item_mean_ewma_r0.9                           1291864    0.4025       0.0110  0.8802  0.0047
+       tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5  1291864    0.4460       0.0101  0.8578  0.0047
+       drift_irt_qt0.01_qd0.01_pv1_fv0_zres          1291864    0.3846       0.0140  0.8829  0.0050
+       bkt_k0.1_r0.9_skill                           1291864    0.4106       0.0140  0.8799  0.0053
+       bkt_k1_r0.9_fluid_lo-2_hi1                    1291864    0.3877       0.0150  0.8820  0.0062
+val    copy_last                                      266798    0.5136       0.0247  0.7963  0.0063
+       item_mean                                      266798    0.3859       0.0090  0.9116  0.0042
+       item_mean_ewma_r0.9                            266798    0.3324       0.0134  0.9269  0.0041
+       tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5   266798    0.3768       0.0111  0.9077  0.0047
+       drift_irt_qt0.01_qd0.01_pv1_fv0_zres           266798    0.3210       0.0150  0.9269  0.0045
+       bkt_k0.1_r0.9_skill                            266798    0.3258       0.0159  0.9254  0.0050
+       bkt_k1_r0.9_fluid_lo-2_hi1                     266798    0.3311       0.0164  0.9226  0.0056
+test   copy_last                                      266798    0.4897       0.0352  0.8088  0.0075
+       item_mean                                      266798    0.3747       0.0138  0.9157  0.0054
+       item_mean_ewma_r0.9                            266798    0.3165       0.0195  0.9334  0.0056
+       tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5   266798    0.3745       0.0240  0.9124  0.0060
+       drift_irt_qt0.01_qd0.01_pv1_fv0_zres           266798    0.3053       0.0218  0.9334  0.0060
+       bkt_k0.1_r0.9_skill                            266798    0.3095       0.0228  0.9327  0.0063
+       bkt_k1_r0.9_fluid_lo-2_hi1                     266798    0.3163       0.0219  0.9294  0.0066
+
+h=1 paired differences, model minus item_mean_ewma_r0.9 (95% bootstrap interval; negative log-loss / positive AUC favour the model)
+
+  test block
+                                                         diff      se  ci_low  ci_high  n_slices                     reading
+a                                            metric                                                                         
+copy_last                                    log_loss  0.1732  0.0178  0.1480   0.2116      1083                    b better
+                                             auc      -0.1246  0.0024 -0.1291  -0.1201      1083                    b better
+item_mean                                    log_loss  0.0582  0.0047  0.0475   0.0659      1083                    b better
+                                             auc      -0.0177  0.0010 -0.0200  -0.0157      1083                    b better
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5 log_loss  0.0579  0.0076  0.0440   0.0727      1083                    b better
+                                             auc      -0.0210  0.0017 -0.0236  -0.0178      1083                    b better
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres         log_loss -0.0112  0.0017 -0.0140  -0.0077      1083                    a better
+                                             auc      -0.0000  0.0002 -0.0003   0.0003      1083  no demonstrated difference
+bkt_k0.1_r0.9_skill                          log_loss -0.0070  0.0043 -0.0126   0.0023      1083  no demonstrated difference
+                                             auc      -0.0008  0.0007 -0.0023   0.0000      1083  no demonstrated difference
+bkt_k1_r0.9_fluid_lo-2_hi1                   log_loss -0.0002  0.0045 -0.0084   0.0088      1083  no demonstrated difference
+                                             auc      -0.0041  0.0015 -0.0074  -0.0019      1083                    b better
+
+  val block
+                                                         diff      se  ci_low  ci_high  n_slices                     reading
+a                                            metric                                                                         
+copy_last                                    log_loss  0.1811  0.0121  0.1621   0.2078      1083                    b better
+                                             auc      -0.1306  0.0025 -0.1357  -0.1262      1083                    b better
+item_mean                                    log_loss  0.0534  0.0038  0.0457   0.0603      1083                    b better
+                                             auc      -0.0153  0.0009 -0.0171  -0.0137      1083                    b better
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5 log_loss  0.0444  0.0049  0.0352   0.0538      1083                    b better
+                                             auc      -0.0192  0.0014 -0.0218  -0.0165      1083                    b better
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres         log_loss -0.0114  0.0010 -0.0133  -0.0095      1083                    a better
+                                             auc      -0.0000  0.0001 -0.0003   0.0003      1083  no demonstrated difference
+bkt_k0.1_r0.9_skill                          log_loss -0.0066  0.0033 -0.0116   0.0004      1083  no demonstrated difference
+                                             auc      -0.0015  0.0010 -0.0037  -0.0001      1083                    b better
+bkt_k1_r0.9_fluid_lo-2_hi1                   log_loss -0.0013  0.0040 -0.0084   0.0072      1083  no demonstrated difference
+                                             auc      -0.0043  0.0019 -0.0086  -0.0015      1083                    b better
+
+  pooled over the run
+                                                         diff      se  ci_low  ci_high  n_slices                     reading
+a                                            metric                                                                         
+copy_last                                    log_loss  0.1704  0.0098  0.1547   0.1913      5244                    b better
+                                             auc      -0.1167  0.0016 -0.1195  -0.1138      5244                    b better
+item_mean                                    log_loss  0.0544  0.0038  0.0466   0.0611      5244                    b better
+                                             auc      -0.0182  0.0004 -0.0190  -0.0173      5244                    b better
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5 log_loss  0.0435  0.0037  0.0358   0.0501      5244                    b better
+                                             auc      -0.0224  0.0013 -0.0246  -0.0196      5244                    b better
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres         log_loss -0.0179  0.0027 -0.0225  -0.0125      5244                    a better
+                                             auc       0.0028  0.0003  0.0023   0.0034      5244                    a better
+bkt_k0.1_r0.9_skill                          log_loss  0.0081  0.0034  0.0030   0.0159      5244                    b better
+                                             auc      -0.0003  0.0005 -0.0015   0.0005      5244  no demonstrated difference
+bkt_k1_r0.9_fluid_lo-2_hi1                   log_loss -0.0148  0.0047 -0.0230  -0.0053      5244                    a better
+                                             auc       0.0019  0.0017 -0.0019   0.0045      5244  no demonstrated difference
+
+h=1 test-block headline:
+  T-SKIRT            log-loss +0.0579 [+0.0440, +0.0727] (b better); AUC -0.0210 [-0.0236, -0.0178] (b better)
+  DriftIRT           log-loss -0.0112 [-0.0140, -0.0077] (a better); AUC -0.0000 [-0.0003, +0.0003] (no demonstrated difference)
+  BKT, skill anchor  log-loss -0.0070 [-0.0126, +0.0023] (no demonstrated difference); AUC -0.0008 [-0.0023, +0.0000] (no demonstrated difference)
+  BKT, Fluid anchor  log-loss -0.0002 [-0.0084, +0.0088] (no demonstrated difference); AUC -0.0041 [-0.0074, -0.0019] (b better)
+
+====================================================================================================
+Horizon 5
+====================================================================================================
+Test-block forecast origins 70 to 88. Retrospective: hyperparameters were chosen on targets up to 74, later than these forecast origins.
+Row alignment on (model, origin_idx, target_idx, skill):
+                                              n_rows  n_kept  n_dropped  dropped_origin_min  dropped_origin_max
+predictor                                                                                                      
+bkt_k0.1_r0.9_skill                             5016    5016          0                 NaN                 NaN
+bkt_k1_r0.9_fluid_lo-2_hi1                      5016    5016          0                 NaN                 NaN
+copy_last                                       5016    5016          0                 NaN                 NaN
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres            5016    5016          0                 NaN                 NaN
+item_mean                                       5016    5016          0                 NaN                 NaN
+item_mean_ewma_r0.9                             5016    5016          0                 NaN                 NaN
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5    5016    5016          0                 NaN                 NaN
+Identical row sets for every predictor; nothing dropped.
+
+h=5 scores (cluster-bootstrap SEs over skills, n_boot=200)
+                                                           n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                                   
+pooled copy_last                                     1235696    0.6073       0.0192  0.7513  0.0058
+       item_mean                                     1235696    0.4843       0.0051  0.8511  0.0048
+       item_mean_ewma_r0.9                           1235696    0.4301       0.0089  0.8683  0.0047
+       tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5  1235696    0.4630       0.0077  0.8556  0.0049
+       drift_irt_qt0.01_qd0.01_pv1_fv0_zres          1235696    0.4064       0.0126  0.8732  0.0051
+       bkt_k0.1_r0.9_skill                           1235696    0.4502       0.0110  0.8683  0.0054
+       bkt_k1_r0.9_fluid_lo-2_hi1                    1235696    0.4048       0.0140  0.8763  0.0063
+val    copy_last                                      266798    0.5337       0.0250  0.7888  0.0061
+       item_mean                                      266798    0.3955       0.0088  0.9070  0.0043
+       item_mean_ewma_r0.9                            266798    0.3438       0.0132  0.9206  0.0044
+       tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5   266798    0.3929       0.0106  0.9046  0.0045
+       drift_irt_qt0.01_qd0.01_pv1_fv0_zres           266798    0.3318       0.0148  0.9213  0.0048
+       bkt_k0.1_r0.9_skill                            266798    0.3391       0.0147  0.9196  0.0050
+       bkt_k1_r0.9_fluid_lo-2_hi1                     266798    0.3456       0.0172  0.9162  0.0062
+test   copy_last                                      266798    0.5027       0.0236  0.7990  0.0061
+       item_mean                                      266798    0.3824       0.0134  0.9122  0.0054
+       item_mean_ewma_r0.9                            266798    0.3255       0.0183  0.9290  0.0054
+       tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5   266798    0.3815       0.0185  0.9100  0.0057
+       drift_irt_qt0.01_qd0.01_pv1_fv0_zres           266798    0.3155       0.0217  0.9292  0.0058
+       bkt_k0.1_r0.9_skill                            266798    0.3234       0.0221  0.9280  0.0063
+       bkt_k1_r0.9_fluid_lo-2_hi1                     266798    0.3258       0.0203  0.9254  0.0063
+
+h=5 paired differences, model minus item_mean_ewma_r0.9 (95% bootstrap interval; negative log-loss / positive AUC favour the model)
+
+  test block
+                                                         diff      se  ci_low  ci_high  n_slices                     reading
+a                                            metric                                                                         
+copy_last                                    log_loss  0.1773  0.0062  0.1663   0.1903      1083                    b better
+                                             auc      -0.1300  0.0021 -0.1340  -0.1258      1083                    b better
+item_mean                                    log_loss  0.0569  0.0040  0.0476   0.0638      1083                    b better
+                                             auc      -0.0168  0.0010 -0.0190  -0.0149      1083                    b better
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5 log_loss  0.0560  0.0041  0.0473   0.0634      1083                    b better
+                                             auc      -0.0190  0.0014 -0.0211  -0.0163      1083                    b better
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres         log_loss -0.0100  0.0028 -0.0140  -0.0044      1083                    a better
+                                             auc       0.0002  0.0002 -0.0002   0.0007      1083  no demonstrated difference
+bkt_k0.1_r0.9_skill                          log_loss -0.0021  0.0048 -0.0085   0.0081      1083  no demonstrated difference
+                                             auc      -0.0010  0.0009 -0.0030   0.0000      1083  no demonstrated difference
+bkt_k1_r0.9_fluid_lo-2_hi1                   log_loss  0.0004  0.0038 -0.0065   0.0084      1083  no demonstrated difference
+                                             auc      -0.0036  0.0014 -0.0067  -0.0014      1083                    b better
+
+  val block
+                                                         diff      se  ci_low  ci_high  n_slices                     reading
+a                                            metric                                                                         
+copy_last                                    log_loss  0.1899  0.0131  0.1690   0.2189      1083                    b better
+                                             auc      -0.1318  0.0023 -0.1366  -0.1276      1083                    b better
+item_mean                                    log_loss  0.0518  0.0039  0.0438   0.0586      1083                    b better
+                                             auc      -0.0136  0.0010 -0.0157  -0.0118      1083                    b better
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5 log_loss  0.0491  0.0056  0.0371   0.0593      1083                    b better
+                                             auc      -0.0160  0.0012 -0.0183  -0.0136      1083                    b better
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres         log_loss -0.0120  0.0009 -0.0137  -0.0100      1083                    a better
+                                             auc       0.0007  0.0002  0.0002   0.0011      1083                    a better
+bkt_k0.1_r0.9_skill                          log_loss -0.0046  0.0021 -0.0082  -0.0005      1083                    a better
+                                             auc      -0.0010  0.0006 -0.0024  -0.0001      1083                    b better
+bkt_k1_r0.9_fluid_lo-2_hi1                   log_loss  0.0018  0.0050 -0.0064   0.0126      1083  no demonstrated difference
+                                             auc      -0.0044  0.0024 -0.0104  -0.0011      1083                    b better
+
+  pooled over the run
+                                                         diff      se  ci_low  ci_high  n_slices                     reading
+a                                            metric                                                                         
+copy_last                                    log_loss  0.1772  0.0108  0.1586   0.1996      5016                    b better
+                                             auc      -0.1170  0.0016 -0.1200  -0.1140      5016                    b better
+item_mean                                    log_loss  0.0542  0.0038  0.0463   0.0610      5016                    b better
+                                             auc      -0.0172  0.0005 -0.0180  -0.0163      5016                    b better
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5 log_loss  0.0329  0.0033  0.0261   0.0388      5016                    b better
+                                             auc      -0.0127  0.0012 -0.0147  -0.0104      5016                    b better
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres         log_loss -0.0237  0.0032 -0.0290  -0.0171      5016                    a better
+                                             auc       0.0049  0.0003  0.0043   0.0056      5016                    a better
+bkt_k0.1_r0.9_skill                          log_loss  0.0200  0.0026  0.0162   0.0262      5016                    b better
+                                             auc      -0.0000  0.0006 -0.0014   0.0007      5016  no demonstrated difference
+bkt_k1_r0.9_fluid_lo-2_hi1                   log_loss -0.0253  0.0056 -0.0350  -0.0139      5016                    a better
+                                             auc       0.0080  0.0018  0.0038   0.0107      5016                    a better
+
+h=5 test-block headline: (Retrospective: hyperparameters were chosen on targets up to 74, later than these forecast origins.)
+  T-SKIRT            log-loss +0.0560 [+0.0473, +0.0634] (b better); AUC -0.0190 [-0.0211, -0.0163] (b better)
+  DriftIRT           log-loss -0.0100 [-0.0140, -0.0044] (a better); AUC +0.0002 [-0.0002, +0.0007] (no demonstrated difference)
+  BKT, skill anchor  log-loss -0.0021 [-0.0085, +0.0081] (no demonstrated difference); AUC -0.0010 [-0.0030, +0.0000] (no demonstrated difference)
+  BKT, Fluid anchor  log-loss +0.0004 [-0.0065, +0.0084] (no demonstrated difference); AUC -0.0036 [-0.0067, -0.0014] (b better)
+
+====================================================================================================
+Horizon 20
+====================================================================================================
+Test-block forecast origins 55 to 73. Retrospective: hyperparameters were chosen on targets up to 74, later than these forecast origins.
+Row alignment on (model, origin_idx, target_idx, skill):
+                                              n_rows  n_kept  n_dropped  dropped_origin_min  dropped_origin_max
+predictor                                                                                                      
+bkt_k0.1_r0.9_skill                             4161    4161          0                 NaN                 NaN
+bkt_k1_r0.9_fluid_lo-2_hi1                      4161    4161          0                 NaN                 NaN
+copy_last                                       4161    4161          0                 NaN                 NaN
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres            4161    4161          0                 NaN                 NaN
+item_mean                                       4161    4161          0                 NaN                 NaN
+item_mean_ewma_r0.9                             4161    4161          0                 NaN                 NaN
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5    4161    4161          0                 NaN                 NaN
+Identical row sets for every predictor; nothing dropped.
+
+h=20 scores (cluster-bootstrap SEs over skills, n_boot=200)
+                                                           n  log_loss  log_loss_se     auc  auc_se
+scope  predictor                                                                                   
+pooled copy_last                                     1025066    0.6428       0.0146  0.7408  0.0053
+       item_mean                                     1025066    0.5449       0.0044  0.8255  0.0052
+       item_mean_ewma_r0.9                           1025066    0.4869       0.0064  0.8441  0.0050
+       tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5  1025066    0.5179       0.0049  0.8436  0.0056
+       drift_irt_qt0.01_qd0.01_pv1_fv0_zres          1025066    0.4555       0.0109  0.8519  0.0057
+       bkt_k0.1_r0.9_skill                           1025066    0.5250       0.0102  0.8442  0.0059
+       bkt_k1_r0.9_fluid_lo-2_hi1                    1025066    0.4362       0.0142  0.8653  0.0072
+val    copy_last                                      266798    0.5723       0.0192  0.7684  0.0058
+       item_mean                                      266798    0.4370       0.0073  0.8874  0.0050
+       item_mean_ewma_r0.9                            266798    0.3779       0.0116  0.9028  0.0049
+       tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5   266798    0.4636       0.0082  0.8876  0.0050
+       drift_irt_qt0.01_qd0.01_pv1_fv0_zres           266798    0.3647       0.0141  0.9039  0.0053
+       bkt_k0.1_r0.9_skill                            266798    0.3780       0.0142  0.9012  0.0060
+       bkt_k1_r0.9_fluid_lo-2_hi1                     266798    0.3811       0.0182  0.9002  0.0070
+test   copy_last                                      266798    0.5389       0.0272  0.7860  0.0067
+       item_mean                                      266798    0.4136       0.0121  0.8976  0.0057
+       item_mean_ewma_r0.9                            266798    0.3554       0.0173  0.9144  0.0057
+       tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5   266798    0.4370       0.0125  0.8967  0.0058
+       drift_irt_qt0.01_qd0.01_pv1_fv0_zres           266798    0.3471       0.0210  0.9147  0.0063
+       bkt_k0.1_r0.9_skill                            266798    0.3585       0.0198  0.9137  0.0062
+       bkt_k1_r0.9_fluid_lo-2_hi1                     266798    0.3561       0.0195  0.9120  0.0069
+
+h=20 paired differences, model minus item_mean_ewma_r0.9 (95% bootstrap interval; negative log-loss / positive AUC favour the model)
+
+  test block
+                                                         diff      se  ci_low  ci_high  n_slices                     reading
+a                                            metric                                                                         
+copy_last                                    log_loss  0.1834  0.0111  0.1669   0.2077      1083                    b better
+                                             auc      -0.1285  0.0015 -0.1312  -0.1256      1083                    b better
+item_mean                                    log_loss  0.0581  0.0043  0.0495   0.0653      1083                    b better
+                                             auc      -0.0168  0.0008 -0.0183  -0.0153      1083                    b better
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5 log_loss  0.0816  0.0061  0.0682   0.0911      1083                    b better
+                                             auc      -0.0177  0.0010 -0.0195  -0.0155      1083                    b better
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres         log_loss -0.0083  0.0030 -0.0131  -0.0026      1083                    a better
+                                             auc       0.0003  0.0002 -0.0001   0.0007      1083  no demonstrated difference
+bkt_k0.1_r0.9_skill                          log_loss  0.0031  0.0035 -0.0020   0.0112      1083  no demonstrated difference
+                                             auc      -0.0007  0.0005 -0.0019  -0.0001      1083                    b better
+bkt_k1_r0.9_fluid_lo-2_hi1                   log_loss  0.0007  0.0035 -0.0056   0.0079      1083  no demonstrated difference
+                                             auc      -0.0024  0.0016 -0.0060   0.0002      1083  no demonstrated difference
+
+  val block
+                                                         diff      se  ci_low  ci_high  n_slices                     reading
+a                                            metric                                                                         
+copy_last                                    log_loss  0.1945  0.0078  0.1813   0.2108      1083                    b better
+                                             auc      -0.1344  0.0016 -0.1371  -0.1313      1083                    b better
+item_mean                                    log_loss  0.0591  0.0041  0.0511   0.0669      1083                    b better
+                                             auc      -0.0154  0.0009 -0.0175  -0.0137      1083                    b better
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5 log_loss  0.0858  0.0053  0.0742   0.0952      1083                    b better
+                                             auc      -0.0152  0.0010 -0.0171  -0.0133      1083                    b better
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres         log_loss -0.0132  0.0015 -0.0160  -0.0101      1083                    a better
+                                             auc       0.0011  0.0003  0.0006   0.0017      1083                    a better
+bkt_k0.1_r0.9_skill                          log_loss  0.0001  0.0033 -0.0052   0.0073      1083  no demonstrated difference
+                                             auc      -0.0016  0.0014 -0.0046   0.0001      1083  no demonstrated difference
+bkt_k1_r0.9_fluid_lo-2_hi1                   log_loss  0.0032  0.0083 -0.0087   0.0214      1083  no demonstrated difference
+                                             auc      -0.0025  0.0029 -0.0092   0.0011      1083  no demonstrated difference
+
+  pooled over the run
+                                                         diff      se  ci_low  ci_high  n_slices                     reading
+a                                            metric                                                                         
+copy_last                                    log_loss  0.1559  0.0089  0.1411   0.1741      4161                    b better
+                                             auc      -0.1033  0.0010 -0.1055  -0.1013      4161                    b better
+item_mean                                    log_loss  0.0580  0.0036  0.0506   0.0646      4161                    b better
+                                             auc      -0.0185  0.0008 -0.0202  -0.0171      4161                    b better
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5 log_loss  0.0311  0.0035  0.0231   0.0364      4161                    b better
+                                             auc      -0.0005  0.0016 -0.0032   0.0031      4161  no demonstrated difference
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres         log_loss -0.0314  0.0043 -0.0386  -0.0233      4161                    a better
+                                             auc       0.0078  0.0004  0.0071   0.0085      4161                    a better
+bkt_k0.1_r0.9_skill                          log_loss  0.0381  0.0040  0.0317   0.0477      4161                    b better
+                                             auc       0.0001  0.0007 -0.0015   0.0010      4161  no demonstrated difference
+bkt_k1_r0.9_fluid_lo-2_hi1                   log_loss -0.0507  0.0083 -0.0649  -0.0339      4161                    a better
+                                             auc       0.0213  0.0023  0.0156   0.0246      4161                    a better
+
+h=20 test-block headline: (Retrospective: hyperparameters were chosen on targets up to 74, later than these forecast origins.)
+  T-SKIRT            log-loss +0.0816 [+0.0682, +0.0911] (b better); AUC -0.0177 [-0.0195, -0.0155] (b better)
+  DriftIRT           log-loss -0.0083 [-0.0131, -0.0026] (a better); AUC +0.0003 [-0.0001, +0.0007] (no demonstrated difference)
+  BKT, skill anchor  log-loss +0.0031 [-0.0020, +0.0112] (no demonstrated difference); AUC -0.0007 [-0.0019, -0.0001] (b better)
+  BKT, Fluid anchor  log-loss +0.0007 [-0.0056, +0.0079] (no demonstrated difference); AUC -0.0024 [-0.0060, +0.0002] (no demonstrated difference)
+
+Wrote docs/figures/bar_rescoring.png
+
+
+====================================================================================================
+Sensitivity: the half-life-8 recency control (rho 0.917004), horizon 1
+====================================================================================================
+Scores (cluster-bootstrap SEs over skills, n_boot=200). rho 0.9 stays the bar: it is the best of the declared grid; half-life 8 is archived as sensitivity.
+                                                 n  log_loss  log_loss_se     auc  auc_se
+scope predictor                                                                          
+val   item_mean                             266798    0.3859       0.0100  0.9116  0.0047
+      item_mean_ewma_r0.9                   266798    0.3324       0.0133  0.9269  0.0042
+      item_mean_ewma_r0.917004              266798    0.3312       0.0140  0.9270  0.0045
+      drift_irt_qt0.01_qd0.01_pv1_fv0_zres  266798    0.3210       0.0138  0.9269  0.0043
+test  item_mean                             266798    0.3747       0.0145  0.9157  0.0057
+      item_mean_ewma_r0.9                   266798    0.3165       0.0186  0.9334  0.0056
+      item_mean_ewma_r0.917004              266798    0.3146       0.0199  0.9336  0.0060
+      drift_irt_qt0.01_qd0.01_pv1_fv0_zres  266798    0.3053       0.0204  0.9334  0.0057
+
+Paired differences, test block, DriftIRT minus each control (95% bootstrap interval)
+                                     diff      se  ci_low  ci_high                     reading
+b                        metric                                                               
+item_mean_ewma_r0.9      log_loss -0.0112  0.0017 -0.0140  -0.0077                    a better
+                         auc      -0.0000  0.0002 -0.0003   0.0003  no demonstrated difference
+item_mean_ewma_r0.917004 log_loss -0.0093  0.0018 -0.0120  -0.0058                    a better
+                         auc      -0.0002  0.0001 -0.0004   0.0000  no demonstrated difference
+
+Share of DriftIRT's test log-loss gain over the plain item mean captured by recency,
+(item_mean - control) / (item_mean - DriftIRT):
+  item_mean_ewma_r0.9        0.0582 / 0.0694 = 0.839
+  item_mean_ewma_r0.917004   0.0601 / 0.0694 = 0.866
+
+T-SKIRT with temperature calibration (stored in models_calibrated_h1, not rescored against the
+bar), validation block, horizon 1. minus_bar is validation log-loss minus the bar's.
+                                                                     n  log_loss  log_loss_se  minus_bar     auc  auc_se
+predictor                                                                                                               
+item_mean_ewma_r0.9                                             266798    0.3324       0.0129     0.0000  0.9269  0.0043
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5                    266798    0.3768       0.0119     0.0444  0.9077  0.0053
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5_cal_temperaturek5  266798    0.3752       0.0119     0.0428  0.9077  0.0049
+
+
+====================================================================================================
+Section 2: the tokens-seen clock (time_col = tokens_seen_b)
+====================================================================================================
+
+T-SKIRT, validation block, horizon 1 (the checkpoint-clock setting for reference)
+                                                              clock  log_loss  log_loss_se     auc  auc_se
+predictor                                                                                                 
+tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5         checkpoint_idx    0.3768       0.0116  0.9077  0.0048
+tskirt_nu0.154303_tokens_seen_b_recal_tau2_taua0.5    tokens_seen_b    0.3769       0.0122  0.9077  0.0048
+tskirt_nu0.0952381_tokens_seen_b_recal_tau2_taua0.5   tokens_seen_b    0.3785       0.0094  0.9072  0.0043
+tskirt_nu0.0771517_tokens_seen_b_recal_tau2_taua0.5   tokens_seen_b    0.3821       0.0091  0.9066  0.0047
+tskirt_nu0.308607_tokens_seen_b_recal_tau2_taua0.5    tokens_seen_b    0.3946       0.0138  0.9060  0.0053
+tskirt_nu0.047619_tokens_seen_b_recal_tau2_taua0.5    tokens_seen_b    0.3948       0.0076  0.9044  0.0042
+tskirt_nu0.0238095_tokens_seen_b_recal_tau2_taua0.5   tokens_seen_b    0.4178       0.0067  0.9006  0.0045
+tskirt_nu0.0119048_tokens_seen_b_recal_tau2_taua0.5   tokens_seen_b    0.4379       0.0063  0.8972  0.0043
+Chosen on the tokens clock: tskirt_nu0.154303_tokens_seen_b_recal_tau2_taua0.5
+
+DriftIRT, validation block, horizon 1 (the checkpoint-clock setting for reference)
+                                                                           clock  log_loss  log_loss_se     auc  auc_se
+predictor                                                                                                              
+drift_irt_qt2.38095e-05_qd0.000238095_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3206       0.0137  0.9269  0.0041
+drift_irt_qt7.14286e-05_qd0.000238095_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3207       0.0136  0.9269  0.0041
+drift_irt_qt0.000238095_qd0.000238095_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3210       0.0138  0.9269  0.0043
+drift_irt_qt0.01_qd0.01_pv1_fv0_zres                              checkpoint_idx    0.3210       0.0136  0.9269  0.0041
+drift_irt_qt0.000714286_qd0.000238095_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3216       0.0151  0.9268  0.0045
+drift_irt_qt7.14286e-05_qd0.000714286_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3217       0.0137  0.9266  0.0042
+drift_irt_qt0.000238095_qd0.000714286_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3222       0.0149  0.9266  0.0046
+drift_irt_qt0.000714286_qd0.000714286_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3228       0.0138  0.9266  0.0042
+drift_irt_qt7.14286e-05_qd7.14286e-05_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3291       0.0138  0.9240  0.0040
+drift_irt_qt0.000238095_qd7.14286e-05_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3294       0.0139  0.9239  0.0041
+drift_irt_qt0.000714286_qd7.14286e-05_pv1_fv0_zres_tokens_seen_b   tokens_seen_b    0.3299       0.0138  0.9238  0.0040
+Chosen on the tokens clock: drift_irt_qt2.38095e-05_qd0.000238095_pv1_fv0_zres_tokens_seen_b
+
+Paired differences (95% bootstrap interval), test block and pooled run.
+Re-tuned on validation: each family's tokens-clock setting chosen on validation (DriftIRT's has a
+q_theta ten times smaller than the rescaled checkpoint value, so clock and tuning are confounded).
+Matched parameters: the tokens-clock setting is the exact rescaling of the checkpoint-clock setting
+(DriftIRT q_theta = q_delta = 0.01/42, stored as 0.000238095; T-SKIRT nu = 1/sqrt(42), stored as
+0.154303; rounding to six significant figures, no rerun warranted). The matched comparison exists
+only at h = 1; it was not run at h = 5 or 20. For T-SKIRT the two coincide.
+
+  re-tuned on validation
+                                                                                  a_value  b_value    diff  ci_low  ci_high                     reading
+tuning                 family   comparison                    h  scope  metric                                                                         
+re-tuned on validation T-SKIRT  tokens minus checkpoint clock 1  pooled log_loss   0.4460   0.4460 -0.0000 -0.0001   0.0000  no demonstrated difference
+                                                                        auc        0.8578   0.8578  0.0000 -0.0000   0.0000  no demonstrated difference
+                                                                 test   log_loss   0.3745   0.3745  0.0000 -0.0001   0.0002  no demonstrated difference
+                                                                        auc        0.9124   0.9124 -0.0000 -0.0000   0.0000  no demonstrated difference
+                                tokens clock minus bar        1  pooled log_loss   0.4460   0.4025  0.0435  0.0359   0.0501                    b better
+                                                                        auc        0.8578   0.8802 -0.0224 -0.0246  -0.0196                    b better
+                                                                 test   log_loss   0.3745   0.3165  0.0580  0.0440   0.0728                    b better
+                                                                        auc        0.9124   0.9334 -0.0210 -0.0237  -0.0178                    b better
+                                checkpoint clock minus bar    1  pooled log_loss   0.4460   0.4025  0.0435  0.0358   0.0501                    b better
+                                                                        auc        0.8578   0.8802 -0.0224 -0.0246  -0.0196                    b better
+                                                                 test   log_loss   0.3745   0.3165  0.0579  0.0440   0.0727                    b better
+                                                                        auc        0.9124   0.9334 -0.0210 -0.0236  -0.0178                    b better
+                       DriftIRT tokens minus checkpoint clock 1  pooled log_loss   0.3865   0.3846  0.0019  0.0010   0.0028                    b better
+                                                                        auc        0.8824   0.8829 -0.0005 -0.0006  -0.0004                    b better
+                                                                 test   log_loss   0.3049   0.3053 -0.0005 -0.0008  -0.0001                    a better
+                                                                        auc        0.9335   0.9334  0.0001  0.0000   0.0002                    a better
+                                tokens clock minus bar        1  pooled log_loss   0.3865   0.4025 -0.0160 -0.0200  -0.0115                    a better
+                                                                        auc        0.8824   0.8802  0.0023  0.0019   0.0028                    a better
+                                                                 test   log_loss   0.3049   0.3165 -0.0117 -0.0143  -0.0084                    a better
+                                                                        auc        0.9335   0.9334  0.0001 -0.0002   0.0005  no demonstrated difference
+                                checkpoint clock minus bar    1  pooled log_loss   0.3846   0.4025 -0.0179 -0.0225  -0.0125                    a better
+                                                                        auc        0.8829   0.8802  0.0028  0.0023   0.0034                    a better
+                                                                 test   log_loss   0.3053   0.3165 -0.0112 -0.0140  -0.0077                    a better
+                                                                        auc        0.9334   0.9334 -0.0000 -0.0003   0.0003  no demonstrated difference
+                       T-SKIRT  tokens minus checkpoint clock 5  pooled log_loss   0.4630   0.4630  0.0000  0.0000   0.0001                    b better
+                                                                        auc        0.8556   0.8556  0.0000  0.0000   0.0000                    a better
+                                                                 test   log_loss   0.3814   0.3815 -0.0000 -0.0001   0.0001  no demonstrated difference
+                                                                        auc        0.9100   0.9100 -0.0000 -0.0000   0.0000  no demonstrated difference
+                                tokens clock minus bar        5  pooled log_loss   0.4630   0.4301  0.0329  0.0262   0.0388                    b better
+                                                                        auc        0.8556   0.8683 -0.0127 -0.0146  -0.0103                    b better
+                                                                 test   log_loss   0.3814   0.3255  0.0560  0.0472   0.0633                    b better
+                                                                        auc        0.9100   0.9290 -0.0190 -0.0211  -0.0163                    b better
+                                checkpoint clock minus bar    5  pooled log_loss   0.4630   0.4301  0.0329  0.0261   0.0388                    b better
+                                                                        auc        0.8556   0.8683 -0.0127 -0.0147  -0.0104                    b better
+                                                                 test   log_loss   0.3815   0.3255  0.0560  0.0473   0.0634                    b better
+                                                                        auc        0.9100   0.9290 -0.0190 -0.0211  -0.0163                    b better
+                       DriftIRT tokens minus checkpoint clock 5  pooled log_loss   0.4102   0.4064  0.0037  0.0023   0.0050                    b better
+                                                                        auc        0.8721   0.8732 -0.0011 -0.0013  -0.0010                    b better
+                                                                 test   log_loss   0.3148   0.3155 -0.0007 -0.0019   0.0001  no demonstrated difference
+                                                                        auc        0.9293   0.9292  0.0001  0.0000   0.0002                    a better
+                                tokens clock minus bar        5  pooled log_loss   0.4102   0.4301 -0.0200 -0.0242  -0.0146                    a better
+                                                                        auc        0.8721   0.8683  0.0038  0.0033   0.0045                    a better
+                                                                 test   log_loss   0.3148   0.3255 -0.0107 -0.0141  -0.0062                    a better
+                                                                        auc        0.9293   0.9290  0.0003 -0.0000   0.0007  no demonstrated difference
+                                checkpoint clock minus bar    5  pooled log_loss   0.4064   0.4301 -0.0237 -0.0290  -0.0171                    a better
+                                                                        auc        0.8732   0.8683  0.0049  0.0043   0.0056                    a better
+                                                                 test   log_loss   0.3155   0.3255 -0.0100 -0.0140  -0.0044                    a better
+                                                                        auc        0.9292   0.9290  0.0002 -0.0002   0.0007  no demonstrated difference
+                       T-SKIRT  tokens minus checkpoint clock 20 pooled log_loss   0.5180   0.5179  0.0001  0.0000   0.0001                    b better
+                                                                        auc        0.8437   0.8436  0.0001  0.0000   0.0001                    a better
+                                                                 test   log_loss   0.4371   0.4370  0.0001  0.0001   0.0001                    b better
+                                                                        auc        0.8967   0.8967  0.0000 -0.0000   0.0000  no demonstrated difference
+                                tokens clock minus bar        20 pooled log_loss   0.5180   0.4869  0.0311  0.0231   0.0365                    b better
+                                                                        auc        0.8437   0.8441 -0.0004 -0.0031   0.0032  no demonstrated difference
+                                                                 test   log_loss   0.4371   0.3554  0.0817  0.0682   0.0912                    b better
+                                                                        auc        0.8967   0.9144 -0.0177 -0.0195  -0.0155                    b better
+                                checkpoint clock minus bar    20 pooled log_loss   0.5179   0.4869  0.0311  0.0231   0.0364                    b better
+                                                                        auc        0.8436   0.8441 -0.0005 -0.0032   0.0031  no demonstrated difference
+                                                                 test   log_loss   0.4370   0.3554  0.0816  0.0682   0.0911                    b better
+                                                                        auc        0.8967   0.9144 -0.0177 -0.0195  -0.0155                    b better
+                       DriftIRT tokens minus checkpoint clock 20 pooled log_loss   0.4627   0.4555  0.0072  0.0052   0.0091                    b better
+                                                                        auc        0.8498   0.8519 -0.0021 -0.0023  -0.0019                    b better
+                                                                 test   log_loss   0.3469   0.3471 -0.0003 -0.0017   0.0009  no demonstrated difference
+                                                                        auc        0.9146   0.9147 -0.0001 -0.0002   0.0001  no demonstrated difference
+                                tokens clock minus bar        20 pooled log_loss   0.4627   0.4869 -0.0242 -0.0303  -0.0177                    a better
+                                                                        auc        0.8498   0.8441  0.0057  0.0050   0.0063                    a better
+                                                                 test   log_loss   0.3469   0.3554 -0.0085 -0.0125  -0.0038                    a better
+                                                                        auc        0.9146   0.9144  0.0002 -0.0001   0.0006  no demonstrated difference
+                                checkpoint clock minus bar    20 pooled log_loss   0.4555   0.4869 -0.0314 -0.0386  -0.0233                    a better
+                                                                        auc        0.8519   0.8441  0.0078  0.0071   0.0085                    a better
+                                                                 test   log_loss   0.3471   0.3554 -0.0083 -0.0131  -0.0026                    a better
+                                                                        auc        0.9147   0.9144  0.0003 -0.0001   0.0007  no demonstrated difference
+
+  matched parameters
+                                                                             a_value  b_value    diff  ci_low  ci_high                     reading
+tuning             family   comparison                    h scope  metric                                                                         
+matched parameters T-SKIRT  tokens minus checkpoint clock 1 pooled log_loss   0.4460   0.4460 -0.0000 -0.0001   0.0000  no demonstrated difference
+                                                                   auc        0.8578   0.8578  0.0000 -0.0000   0.0000  no demonstrated difference
+                                                            test   log_loss   0.3745   0.3745  0.0000 -0.0001   0.0002  no demonstrated difference
+                                                                   auc        0.9124   0.9124 -0.0000 -0.0000   0.0000  no demonstrated difference
+                            tokens clock minus bar        1 pooled log_loss   0.4460   0.4025  0.0435  0.0359   0.0501                    b better
+                                                                   auc        0.8578   0.8802 -0.0224 -0.0246  -0.0196                    b better
+                                                            test   log_loss   0.3745   0.3165  0.0580  0.0440   0.0728                    b better
+                                                                   auc        0.9124   0.9334 -0.0210 -0.0237  -0.0178                    b better
+                            checkpoint clock minus bar    1 pooled log_loss   0.4460   0.4025  0.0435  0.0358   0.0501                    b better
+                                                                   auc        0.8578   0.8802 -0.0224 -0.0246  -0.0196                    b better
+                                                            test   log_loss   0.3745   0.3165  0.0579  0.0440   0.0727                    b better
+                                                                   auc        0.9124   0.9334 -0.0210 -0.0236  -0.0178                    b better
+                   DriftIRT tokens minus checkpoint clock 1 pooled log_loss   0.3845   0.3846 -0.0001 -0.0001  -0.0000                    a better
+                                                                   auc        0.8830   0.8829  0.0000  0.0000   0.0000                    a better
+                                                            test   log_loss   0.3053   0.3053 -0.0000 -0.0000  -0.0000                    a better
+                                                                   auc        0.9334   0.9334  0.0000 -0.0000   0.0000  no demonstrated difference
+                            tokens clock minus bar        1 pooled log_loss   0.3845   0.4025 -0.0180 -0.0226  -0.0126                    a better
+                                                                   auc        0.8830   0.8802  0.0028  0.0023   0.0034                    a better
+                                                            test   log_loss   0.3053   0.3165 -0.0112 -0.0140  -0.0077                    a better
+                                                                   auc        0.9334   0.9334 -0.0000 -0.0003   0.0003  no demonstrated difference
+                            checkpoint clock minus bar    1 pooled log_loss   0.3846   0.4025 -0.0179 -0.0225  -0.0125                    a better
+                                                                   auc        0.8829   0.8802  0.0028  0.0023   0.0034                    a better
+                                                            test   log_loss   0.3053   0.3165 -0.0112 -0.0140  -0.0077                    a better
+                                                                   auc        0.9334   0.9334 -0.0000 -0.0003   0.0003  no demonstrated difference

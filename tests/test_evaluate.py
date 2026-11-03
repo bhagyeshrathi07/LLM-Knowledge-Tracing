@@ -10,6 +10,7 @@ from llm_kt.baselines import (
     SkillMean,
 )
 from llm_kt.evaluate import (
+    align_slices,
     evaluate,
     evaluate_model,
     paired_difference,
@@ -317,3 +318,38 @@ class TestPairedDifference:
         )
         out = paired_difference(pd.concat([a, a.assign(predictor="b")]), "a", "b", n_boot=20)
         assert list(out["model"]) == ["m", "z"]
+
+
+class TestAlignSlices:
+    @staticmethod
+    def _rows(predictor, origins, skills=("s1", "s2")):
+        return pd.DataFrame([
+            {"predictor": predictor, "model": "m", "origin_idx": o, "target_idx": o + 1,
+             "skill": s, "n": 10, "log_loss": 0.5}
+            for o in origins for s in skills
+        ])
+
+    def test_identical_row_sets_drop_nothing(self):
+        df = pd.concat([self._rows("a", [1, 2, 3]), self._rows("b", [1, 2, 3])])
+        aligned, dropped = align_slices(df)
+        assert len(aligned) == len(df)
+        assert dropped["n_dropped"].tolist() == [0, 0]
+        assert dropped["dropped_origin_min"].isna().all()
+
+    def test_intersects_and_reports_dropped_origins(self):
+        df = pd.concat([self._rows("a", [1, 2, 3, 4]), self._rows("b", [2, 3])])
+        aligned, dropped = align_slices(df)
+        assert sorted(aligned["origin_idx"].unique()) == [2, 3]
+        assert aligned.groupby("predictor").size().tolist() == [4, 4]
+        row = dropped.set_index("predictor").loc["a"]
+        assert (row["n_dropped"], row["dropped_origin_min"], row["dropped_origin_max"]) == (4, 1, 4)
+
+    def test_rejects_duplicates(self):
+        df = pd.concat([self._rows("a", [1]), self._rows("a", [1])])
+        with pytest.raises(ValueError, match="duplicate"):
+            align_slices(df)
+
+    def test_rejects_disjoint_predictors(self):
+        df = pd.concat([self._rows("a", [1]), self._rows("b", [5])])
+        with pytest.raises(ValueError, match="share no slices"):
+            align_slices(df)
