@@ -93,7 +93,22 @@ Metrics: **log-loss** (quality of the predicted probabilities, lower is better) 
 
 ### 5.1 The bar
 
-The strongest predictor with no learning in it: for each question, average how the model did on it at all previous checkpoints (item mean). One checkpoint ahead: log-loss 0.457, AUC 0.862 pooled; 0.375 ± 0.015 / 0.916 ± 0.006 on the test block.
+**From Sprint 5 the bar is the recency-weighted item mean.** For each question, average how the model did on it at all previous checkpoints, weighting a checkpoint by `rho` to the power of its age. `rho` 0.9 is the best of the declared six-point grid {0.5, 0.7, 0.8, 0.9, 0.95, 0.99} on the validation block (validation log-loss 0.332, against 0.335 for 0.95 and 0.386 for the plain item mean). It is not the strongest known control: a half-life-8 version (`rho` 0.917) has slightly lower validation log-loss (0.3312 against 0.3324); it is archived as a sensitivity check and `rho` 0.9 stays the bar because its grid was declared in advance. One checkpoint ahead: log-loss 0.403, AUC 0.880 pooled; 0.317 ± 0.019 / 0.933 ± 0.006 on the test block. Further ahead, test log-loss 0.325 at horizon 5 and 0.355 at horizon 20.
+
+The earlier bar was the plain item mean (every past checkpoint weighted equally): 0.457 / 0.862 pooled; 0.375 ± 0.014 / 0.916 ± 0.005 on the test block. The recency-weighted version beats it by 0.057 to 0.058 test log-loss at horizons 1, 5 and 20.
+
+**Headline.** On OLMo-2 MMLU at h=1, recency captures most of the improvement over the plain item mean; DriftIRT adds a reproducible 0.011 log-loss improvement with no demonstrated AUC difference, and its mechanism is unproven. (The bar recovers 84% of DriftIRT's test log-loss gain over the item mean.)
+
+Against the new bar, test block, metric by metric ("no demonstrated difference" means the 95% interval includes zero; it is not a claim that the two match):
+
+- **DriftIRT** beats the bar on log-loss at h = 1, 5 and 20 (−0.011, −0.010, −0.008, intervals below zero), with no demonstrated AUC difference. Under the Workbook 1 criterion (beat the bar on both log-loss and within-skill AUC) it therefore does not fully clear the bar. Its log-loss lead survives the half-life-8 control (−0.009 [−0.012, −0.006] at h = 1). Why it wins is unproven: DriftIRT differs from the bar in link, prior, residual update and the shared skill state at once. Workbook 2 (submitted Oct 29) attributed the gain to the per-skill state; that attribution is withdrawn until an ablation that freezes or removes the skill state is run.
+- **BKT, skill anchor:** no demonstrated log-loss difference at any horizon; AUC behind by 0.001 at h = 20 (interval excludes zero).
+- **BKT, Fluid anchor:** no demonstrated log-loss difference at any horizon; AUC behind by 0.004 at h = 1 and h = 5.
+- **T-SKIRT** loses on both metrics at every horizon (log-loss 0.056 to 0.082 worse, AUC about 0.02 worse).
+
+The h = 5 and h = 20 numbers are retrospective: hyperparameters were chosen on targets up to 74, later than these forecast origins (blocks are assigned by target checkpoint). h = 1 is unaffected; re-selecting on targets up to 54 is scheduled.
+
+Where −0.009 [−0.012, −0.006] came from: the figure quoted in Workbook 2 for DriftIRT's lead was from the Oct 27 DriftIRT analysis against an un-archived half-life-8 recency mean (`rho` 0.917), not against `rho` 0.9 and not from a repository CSV. Against the archived `rho` 0.9 bar the lead is −0.011 [−0.014, −0.008]; the half-life-8 comparison is now archived too (`docs/results/bar/sensitivity_halflife8.csv`). Full tables in `docs/project-notes.md` §10 and `docs/results/bar/`; figure `docs/figures/bar_rescoring.png`.
 
 **The result the advisor cared most about.** The baseline ladder, pooled log-loss one checkpoint ahead:
 
@@ -102,6 +117,7 @@ The strongest predictor with no learning in it: for each question, average how t
 | The model's overall score so far (global mean) | 0.69         | 0.661                          |
 | Its score on that subject (skill mean)         | 0.63         | 0.582                          |
 | That question's own history (item mean)        | 0.46         | 0.360                          |
+| That question's recent history (`rho` 0.9)     | 0.40         | not run                        |
 
 Knowing the subject helps little; knowing the question helps a lot. Any learner model must carry per-question difficulty or it loses.
 
@@ -173,7 +189,7 @@ Test-block log-loss further ahead (pooled in brackets), with the paired differen
 
 Reading, in five lines:
 
-- BKT beats the bar on both metrics at every horizon, including horizon 20 where T-SKIRT lost. The gain is 0.06 log-loss and 0.017 AUC on the test block.
+- BKT beats the bar (the bar at the time, the plain item mean) on both metrics at every horizon, including horizon 20 where T-SKIRT lost. The gain is 0.06 log-loss and 0.017 AUC on the test block.
 - Most of the gain is recency. With `rho` 1 the best BKT setting beats the item mean by only 0.013 log-loss on the test block; with `rho` 0.9 by 0.065. A recency-weighted item mean (one line, same `rho`) ties BKT on the test block at every horizon and beats it pooled.
 - Classic BKT with one guess/slip pair per subject is the skill mean: log-loss 0.62, AUC 0.50 by construction. Per-question numbers are not optional.
 - The Fluid-anchored variant is the only one that beats the control anywhere: pooled over the run (which includes early training, when histories are short) it leads by 0.015 to 0.051 log-loss; on the test block it ties on log-loss and the control ranks slightly better (AUC −0.004).
@@ -225,6 +241,8 @@ Owners follow the track split from Sep 29 (Ronak: data, harness, visualization; 
 | Phase 2 GPU pilot and cost estimate; go/no-go         | Aniket   | Nov 25; Dec 12 | On the calendar                                                                                                                                                   |
 
 **Everyone:** read `meetings/2026-10-19-advisor.md` and correct anything you remember differently before the next team meeting.
+
+**Status as of 2026-11-03.** The bar is now the recency-weighted item mean with `rho` 0.9, the best of the declared grid on validation, and every learner model has been rescored against it at horizons 1, 5 and 20 without re-tuning (`docs/project-notes.md` §10). On OLMo-2 MMLU at h=1, recency captures most of the improvement over the plain item mean; DriftIRT adds a reproducible 0.011 log-loss improvement with no demonstrated AUC difference, and its mechanism is unproven. Its log-loss lead also holds at h = 5 and 20 (−0.010, −0.008) and against the half-life-8 control (−0.009); without an AUC gain it does not fully meet the Workbook 1 criterion. The Workbook 2 attribution of the gain to the per-skill state is withdrawn pending a skill-state ablation. Neither BKT setting shows a demonstrated log-loss difference from the bar at any horizon (skill anchor AUC behind by 0.001 at h = 20; Fluid anchor AUC behind by 0.004 at h = 1 and 5), and T-SKIRT loses on both metrics. The h = 5 and 20 comparisons are retrospective (tuning saw targets up to 74, later than their forecast origins); re-selection on targets up to 54 is the follow-up. The tokens-seen clock was also run for T-SKIRT and DriftIRT. On the test block it changes log-loss by less than 0.001, because OLMo-2's checkpoints are almost evenly spaced (81 of 93 gaps are 42 billion tokens). Pooled over the run, DriftIRT on the re-tuned tokens setting is up to 0.007 worse, but that setting has a ten times smaller `q_theta`, so clock and tuning are confounded; with exactly rescaled parameters (h = 1 only) the clock changes DriftIRT by less than 0.0001. The clock will matter once learner models are pooled across models with different spacing (Pythia, Amber, K2). One practical note: T-SKIRT's `nu` rescales with the square root of the clock length, not linearly; on the tokens clock the validation optimum is `nu` 1/√42 ≈ 0.154.
 
 ---
 

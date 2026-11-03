@@ -520,3 +520,162 @@ What BKT still offers the project is the forgetting machinery and the interpreta
 2. Fit the per-skill limit with a second initialisation and report its mastery curves as the forgetting story's figure; that figure, not the selected setting's, is the one to show the advisor.
 3. Pool across the six models at the skill level (shared `learn` and `forget` per subject, per-model emissions) as the one way a per-skill state could add information the item's own history does not have.
 4. Try the Fluid anchor with `kappa` below 1 and with `rho` between 0.9 and 1, since both optima were at grid edges in the directions that matter least for the verdict.
+
+---
+
+## 10. Rescoring against the recency-weighted bar and the tokens-seen clock, 2026-11-03
+
+Two questions left open by §9. First, Workbook 2 set the bar from Sprint 5 to the recency-weighted item mean with its weight `rho` chosen on validation. `rho` 0.9 had been run as the BKT control on Oct 27, and DriftIRT had been compared once against a half-life-8 variant in the Oct 27 DriftIRT analysis; no model had been rescored against a bar chosen on validation at every horizon with archived tables. Second, T-SKIRT and DriftIRT can measure time in tokens seen instead of checkpoint index, and that had never been run. Everything is OLMo-2 7B on MMLU (Decision 6), walk-forward, train targets 0 to 55, validation 56 to 74, test 75 to 93. Selection uses the validation block only; test numbers are reported, never ranked. "±" is a bootstrap standard error over the 57 subjects (200 replicates); intervals are 95% paired cluster-bootstrap intervals. Tables: `docs/results/bar/`; figure: `docs/figures/bar_rescoring.png`; script: `scripts/analyze_bar.py`.
+
+**Headline.** On OLMo-2 MMLU at h=1, recency captures most of the improvement over the plain item mean; DriftIRT adds a reproducible 0.011 log-loss improvement with no demonstrated AUC difference, and its mechanism is unproven. ("Most": the `rho` 0.9 bar recovers 0.0582 of DriftIRT's 0.0694 test log-loss gain over the item mean, 84%; the half-life-8 control recovers 87%; `sensitivity_halflife8.csv`.)
+
+**Correction to Workbook 2.** Workbook 2 (submitted Oct 29) attributed DriftIRT's gain over the recency-weighted item mean to the per-skill state. That attribution is withdrawn pending an ablation (Follow-ups below). It also quoted DriftIRT's lead as −0.009 [−0.012, −0.006]. That figure came from the Oct 27 DriftIRT analysis against an exponentially weighted item mean with half-life 8 checkpoints (`rho` 0.917), which was never archived; it is not the comparison against `rho` 0.9 and it did not come from a repository CSV. The archived comparison against `rho` 0.9 gives −0.011 [−0.014, −0.008]; the sensitivity run below now archives the half-life-8 comparison: −0.0093 [−0.0120, −0.0058], the quoted figure at three decimals.
+
+### Method
+
+- **The bar.** The recency-weighted item mean gives each past checkpoint weight `rho` to the power of its age and shrinks the result toward the overall mean with one pseudo-observation (`rho` 1 is the item mean). `rho` in {0.5, 0.7, 0.8, 0.9, 0.95, 0.99} at horizon 1, chosen by validation log-loss, then run at horizons 5 and 20.
+- **The learner models are rescored, not re-tuned.** T-SKIRT (`nu` 1, `tau` 2, `tau_a` 0.5), DriftIRT (`q_theta` 0.01, `q_delta` 0.01, residual prior variance 1, plug-in forecast, probit-scale residual) and the two BKT settings of §9 keep the settings chosen earlier on validation. T-SKIRT and DriftIRT were chosen when the item mean was the bar; that does not change which setting won, because each was chosen by its own validation log-loss within its family. The result files on disk were reused (no BKT rerun).
+- **Look-ahead at h = 5 and 20.** Blocks are assigned by *target* checkpoint, and every hyperparameter (`rho`, `q`, `nu`) was chosen on validation targets 56 to 74. At h = 20 every test forecast originates at checkpoints 55 to 73, and at h = 5 the first four origins (70 to 73) are before 74. Tuning therefore saw observations later than those forecast origins; the test labels themselves stay held out. The h = 5 and h = 20 results, paired comparisons included, are retrospective. h = 1 is unaffected (test origins 74 to 92).
+- **Row alignment.** Every predictor is matched on (model, origin, target, subject) before pairing. All files share identical row sets at every horizon (5,244 slices at horizon 1, 5,016 at 5, 4,161 at 20), so nothing was dropped (`docs/results/bar/alignment.csv`).
+
+### The chosen `rho`
+
+| `rho`         | Val log-loss    | Val AUC |
+| ------------- | --------------- | ------- |
+| 0.5           | 0.4087 ± 0.0120 | 0.9115  |
+| 0.7           | 0.3705 ± 0.0126 | 0.9196  |
+| 0.8           | 0.3502 ± 0.0136 | 0.9238  |
+| 0.9           | 0.3324 ± 0.0123 | 0.9269  |
+| 0.95          | 0.3352 ± 0.0129 | 0.9256  |
+| 0.99          | 0.3693 ± 0.0102 | 0.9164  |
+| 1 (item mean) | 0.3859 ± 0.0097 | 0.9116  |
+
+`rho` 0.9 is chosen (half-life about 6.6 checkpoints): the best of the declared six-point grid {0.5, 0.7, 0.8, 0.9, 0.95, 0.99}, and the value Bhagyesh used for the BKT control; the h = 1 run reproduces his file to machine precision. Stored in `validation_rho.csv`. It is not the strongest known control: the half-life-8 control below has lower validation log-loss.
+
+**Sensitivity: half-life 8** (`rho` = 0.5^(1/8) = 0.917004, h = 1, `sensitivity_halflife8.csv`). `rho` 0.9 stays the bar because it was chosen on a grid declared in advance; half-life 8 is archived as a sensitivity check.
+
+| Control                     | Val log-loss    | Test log-loss   | Test AUC | DriftIRT minus control, test log-loss | DriftIRT minus control, test AUC | Share of DriftIRT's gain over item mean |
+| --------------------------- | --------------- | --------------- | -------- | ------------------------------------- | -------------------------------- | --------------------------------------- |
+| `rho` 0.9 (the bar)         | 0.3324 ± 0.0133 | 0.3165 ± 0.0186 | 0.9334   | −0.0112 [−0.0140, −0.0077]            | −0.0000 [−0.0003, +0.0003]       | 0.839                                   |
+| `rho` 0.917 (half-life 8)   | 0.3312 ± 0.0140 | 0.3146 ± 0.0199 | 0.9336   | −0.0093 [−0.0120, −0.0058]            | −0.0002 [−0.0004, +0.0000]       | 0.866                                   |
+
+Item mean: test log-loss 0.3747; DriftIRT: 0.3053. The share is (item mean − control) / (item mean − DriftIRT) on test log-loss. DriftIRT's log-loss lead survives either control; there is no demonstrated AUC difference against either. (SEs here come from a separate bootstrap over four predictors, so they differ from the table above in the third decimal.)
+
+### Every model against the bar
+
+Test block, log-loss and AUC with SEs; the last two columns are the paired difference model minus the bar (negative log-loss and positive AUC favour the model). Pooled log-loss is over the whole run.
+
+Horizon 1 (`h1_scores.csv`, `h1_paired_differences.csv`):
+
+| Predictor                                       | Pooled log-loss | Test log-loss | Test AUC      | Test log-loss minus the bar | Test AUC minus the bar  |
+| ----------------------------------------------- | --------------- | ------------- | ------------- | --------------------------- | ----------------------- |
+| Copy last                                       | 0.573           | 0.490 ± 0.035 | 0.809 ± 0.008 | +0.173 [+0.148, +0.212]     | −0.125 [−0.129, −0.120] |
+| Item mean (old bar)                             | 0.457           | 0.375 ± 0.014 | 0.916 ± 0.005 | +0.058 [+0.048, +0.066]     | −0.018 [−0.020, −0.016] |
+| Recency-weighted item mean, `rho` 0.9 (the bar) | 0.403           | 0.317 ± 0.019 | 0.933 ± 0.006 |                             |                         |
+| T-SKIRT                                         | 0.446           | 0.374 ± 0.024 | 0.912 ± 0.006 | +0.058 [+0.044, +0.073]     | −0.021 [−0.024, −0.018] |
+| DriftIRT                                        | 0.385           | 0.305 ± 0.022 | 0.933 ± 0.006 | −0.011 [−0.014, −0.008]     | −0.000 [−0.000, +0.000] |
+| BKT, skill anchor                               | 0.411           | 0.310 ± 0.023 | 0.933 ± 0.006 | −0.007 [−0.013, +0.002]     | −0.001 [−0.002, +0.000] |
+| BKT, Fluid anchor                               | 0.388           | 0.316 ± 0.022 | 0.929 ± 0.007 | −0.000 [−0.008, +0.009]     | −0.004 [−0.007, −0.002] |
+
+Horizon 5 (`h5_scores.csv`, `h5_paired_differences.csv`). Retrospective: hyperparameters were chosen on targets up to 74, later than these forecast origins.
+
+| Predictor                                       | Pooled log-loss | Test log-loss | Test AUC      | Test log-loss minus the bar | Test AUC minus the bar  |
+| ----------------------------------------------- | --------------- | ------------- | ------------- | --------------------------- | ----------------------- |
+| Copy last                                       | 0.607           | 0.503 ± 0.024 | 0.799 ± 0.006 | +0.177 [+0.166, +0.190]     | −0.130 [−0.134, −0.126] |
+| Item mean (old bar)                             | 0.484           | 0.382 ± 0.013 | 0.912 ± 0.005 | +0.057 [+0.048, +0.064]     | −0.017 [−0.019, −0.015] |
+| Recency-weighted item mean, `rho` 0.9 (the bar) | 0.430           | 0.325 ± 0.018 | 0.929 ± 0.005 |                             |                         |
+| T-SKIRT                                         | 0.463           | 0.381 ± 0.018 | 0.910 ± 0.006 | +0.056 [+0.047, +0.063]     | −0.019 [−0.021, −0.016] |
+| DriftIRT                                        | 0.406           | 0.316 ± 0.022 | 0.929 ± 0.006 | −0.010 [−0.014, −0.004]     | +0.000 [−0.000, +0.001] |
+| BKT, skill anchor                               | 0.450           | 0.323 ± 0.022 | 0.928 ± 0.006 | −0.002 [−0.008, +0.008]     | −0.001 [−0.003, +0.000] |
+| BKT, Fluid anchor                               | 0.405           | 0.326 ± 0.020 | 0.925 ± 0.006 | +0.000 [−0.006, +0.008]     | −0.004 [−0.007, −0.001] |
+
+Horizon 20 (`h20_scores.csv`, `h20_paired_differences.csv`). Retrospective: hyperparameters were chosen on targets up to 74, later than these forecast origins.
+
+| Predictor                                       | Pooled log-loss | Test log-loss | Test AUC      | Test log-loss minus the bar | Test AUC minus the bar  |
+| ----------------------------------------------- | --------------- | ------------- | ------------- | --------------------------- | ----------------------- |
+| Copy last                                       | 0.643           | 0.539 ± 0.027 | 0.786 ± 0.007 | +0.183 [+0.167, +0.208]     | −0.128 [−0.131, −0.126] |
+| Item mean (old bar)                             | 0.545           | 0.414 ± 0.012 | 0.898 ± 0.006 | +0.058 [+0.050, +0.065]     | −0.017 [−0.018, −0.015] |
+| Recency-weighted item mean, `rho` 0.9 (the bar) | 0.487           | 0.355 ± 0.017 | 0.914 ± 0.006 |                             |                         |
+| T-SKIRT                                         | 0.518           | 0.437 ± 0.013 | 0.897 ± 0.006 | +0.082 [+0.068, +0.091]     | −0.018 [−0.020, −0.016] |
+| DriftIRT                                        | 0.455           | 0.347 ± 0.021 | 0.915 ± 0.006 | −0.008 [−0.013, −0.003]     | +0.000 [−0.000, +0.001] |
+| BKT, skill anchor                               | 0.525           | 0.359 ± 0.020 | 0.914 ± 0.006 | +0.003 [−0.002, +0.011]     | −0.001 [−0.002, −0.000] |
+| BKT, Fluid anchor                               | 0.436           | 0.356 ± 0.019 | 0.912 ± 0.007 | +0.001 [−0.006, +0.008]     | −0.002 [−0.006, +0.000] |
+
+Validation-block and pooled differences are in the same CSVs and in `analysis.txt`.
+
+### Verdict per model
+
+Verdicts are metric by metric. "No demonstrated difference" means the 95% interval includes zero; it is not a claim that the two match. h = 5 and 20 carry the look-ahead qualification above.
+
+- **The ladder.** Copy last, item mean, recency-weighted item mean: each step is a clear win at every horizon. The recency-weighted item mean beats the item mean by 0.057 to 0.058 test log-loss and 0.017 to 0.018 AUC at every horizon, a bigger step than any learner model takes above it.
+- **T-SKIRT loses to the bar on both metrics at every horizon**: 0.056 to 0.082 worse on test log-loss and about 0.02 worse on AUC, all intervals excluding zero. The stored temperature-calibrated variant (`tskirt_nu1_checkpoint_idx_recal_tau2_taua0.5_cal_temperaturek5`, in `models_calibrated_h1.parquet`) has slightly better validation log-loss (0.3752 against 0.3768) and was not rescored; it would not change the verdict, since both are 0.043 to 0.044 behind the bar on validation log-loss (`tskirt_calibrated_validation.csv`).
+- **DriftIRT beats the bar on log-loss at h = 1, 5 and 20** (test −0.011, −0.010, −0.008, every interval below zero; pooled over the run −0.018, −0.024, −0.031), with no demonstrated AUC difference at any horizon. Under the Workbook 1 criterion (beat the bar on both log-loss and within-skill AUC) DriftIRT therefore does not fully clear the bar. The log-loss gain is reproducible. Its source is unproven: DriftIRT differs from the bar in link function, prior, residual update and the shared skill state at once, so this comparison cannot say which of them produces the gain. An ablation that freezes or removes the skill state is the follow-up.
+- **BKT, skill anchor:** no demonstrated log-loss difference at any horizon; AUC behind by 0.001 at h = 20 (interval excludes zero), no demonstrated AUC difference at h = 1 and 5.
+- **BKT, Fluid anchor:** no demonstrated log-loss difference at any horizon; AUC behind by 0.004 at h = 1 and h = 5, no demonstrated AUC difference at h = 20. Pooled over the run the Fluid anchor leads (§9), the skill anchor trails.
+- **Summary.** Recency-weighted per-question history carries most of the improvement over the plain item mean. Of the three learner families, only DriftIRT shows a measurable log-loss improvement beyond it on the late test block, about 0.01, and not on AUC.
+
+### The tokens-seen clock
+
+OLMo-2's checkpoints are almost evenly spaced in tokens: 81 of the 93 gaps are 42 billion tokens, 7 are 46, 3 are 41, one is 20 (the first gap) and one is 28 (the last). Switching the clock from checkpoint index to tokens seen (in billions) therefore mostly rescales the drift parameters, plus a little unevenness at the ends. The two models scale differently:
+
+- **DriftIRT** `q_theta` and `q_delta` are variances per unit time, so a clock 42 times longer divides them by 42. Grid: `q_theta` and `q_delta` each in {0.003, 0.01, 0.03} / 42 (nine settings), plus `q_theta` 0.001 / 42 with `q_delta` 0.01 / 42 after the first pass put the optimum at the lower `q_theta` edge. About 21 s per setting.
+- **T-SKIRT** `nu` is a standard deviation per square root of time (the ability moves as N(0, `nu`² d)), so the counterpart of `nu` 1 on a 42 times longer clock is 1/√42 ≈ 0.154, not 1/42. The grid was the planned {0.5, 1, 2, 4} / 42 plus {0.5, 1, 2} / √42. About 4.5 min per setting.
+
+Validation log-loss at horizon 1 (`clock_validation.csv`):
+
+| Setting                                                    | Val log-loss |
+| ---------------------------------------------------------- | ------------ |
+| T-SKIRT, checkpoint clock, `nu` 1                          | 0.3768       |
+| T-SKIRT, tokens clock, `nu` 1/√42 = 0.154 (chosen)         | 0.3769       |
+| T-SKIRT, tokens clock, `nu` 4/42 = 0.095                   | 0.3785       |
+| T-SKIRT, tokens clock, `nu` 1/42 = 0.024                   | 0.4178       |
+| T-SKIRT, tokens clock, `nu` 0.5/42 = 0.012                 | 0.4379       |
+| DriftIRT, checkpoint clock, `q_theta` 0.01, `q_delta` 0.01 | 0.3210       |
+| DriftIRT, tokens clock, `q_theta` 0.001/42, `q_delta` 0.01/42 (chosen) | 0.3206 |
+| DriftIRT, tokens clock, `q_theta` 0.01/42, `q_delta` 0.01/42 | 0.3210 |
+| DriftIRT, tokens clock, `q_delta` 0.003/42 (any `q_theta`) | 0.3291 to 0.3299 |
+
+For T-SKIRT the validation optimum lands on the square-root rescaling, which confirms the scaling argument; the planned 1/42 grid is best at its top value 4/42 (0.3785), and its centre 1/42 is 0.041 worse than the chosen value. For DriftIRT `q_theta` hardly matters (0.3206 to 0.3216 across a factor of 30) and `q_delta` 0.01/42 is best, the direct rescaling of the checkpoint-clock value.
+
+**Re-tuned on validation.** Each family's tokens-clock setting chosen on validation, against its checkpoint-clock version (`clock_comparison.csv`, rows with `tuning` = "re-tuned on validation"; paired differences tokens minus checkpoint clock, 95% intervals). The h = 5 and 20 rows are retrospective: hyperparameters were chosen on targets up to 74, later than these forecast origins.
+
+| Model    | Horizon | Test log-loss, checkpoint clock | Test log-loss, tokens clock | Test log-loss difference   | Test AUC difference        | Pooled log-loss difference | Tokens clock minus the bar, test log-loss |
+| -------- | ------- | ------------------------------- | --------------------------- | -------------------------- | -------------------------- | -------------------------- | ----------------------------------------- |
+| T-SKIRT  | 1       | 0.3745                          | 0.3745                      | +0.0000 [−0.0001, +0.0002] | −0.0000 [−0.0000, +0.0000] | −0.0000 [−0.0001, +0.0000] | +0.0580 [+0.0440, +0.0728]                |
+| T-SKIRT  | 5       | 0.3815                          | 0.3814                      | −0.0000 [−0.0001, +0.0001] | −0.0000 [−0.0000, +0.0000] | +0.0000 [+0.0000, +0.0001] | +0.0560 [+0.0472, +0.0633]                |
+| T-SKIRT  | 20      | 0.4370                          | 0.4371                      | +0.0001 [+0.0001, +0.0001] | +0.0000 [−0.0000, +0.0000] | +0.0001 [+0.0000, +0.0001] | +0.0817 [+0.0682, +0.0912]                |
+| DriftIRT | 1       | 0.3053                          | 0.3049                      | −0.0005 [−0.0008, −0.0001] | +0.0001 [+0.0000, +0.0002] | +0.0019 [+0.0010, +0.0028] | −0.0117 [−0.0143, −0.0084]                |
+| DriftIRT | 5       | 0.3155                          | 0.3148                      | −0.0007 [−0.0019, +0.0001] | +0.0001 [+0.0000, +0.0002] | +0.0037 [+0.0023, +0.0050] | −0.0107 [−0.0141, −0.0062]                |
+| DriftIRT | 20      | 0.3471                          | 0.3469                      | −0.0003 [−0.0017, +0.0009] | −0.0001 [−0.0002, +0.0001] | +0.0072 [+0.0052, +0.0091] | −0.0085 [−0.0125, −0.0038]                |
+
+On the test block the clock makes no practical difference: every difference is below 0.001 log-loss and 0.0002 AUC, and a few intervals exclude zero only because two near-identical predictors make the paired bootstrap very tight. That statement is scoped to the test block. Pooled over the run, DriftIRT on the re-tuned tokens clock is worse by 0.002, 0.004 and 0.007 at h = 1, 5 and 20 (intervals exclude zero). That setting comes with a chosen `q_theta` ten times smaller than the rescaled checkpoint value (0.001/42 against 0.01/42), so the re-tuned comparison confounds the clock with the tuning and cannot attribute the pooled gap to either.
+
+**Matched parameters (h = 1 only).** The clean comparison pairs each checkpoint-clock setting with its exact rescaling on the tokens clock: DriftIRT `q_theta` = `q_delta` = 0.01/42 (predictor `drift_irt_qt0.000238095_qd0.000238095_pv1_fv0_zres_tokens_seen_b`) against `q_theta` = `q_delta` = 0.01, and T-SKIRT `nu` 1/√42 = 0.154303 against `nu` 1 (the same pair as above, since validation chose the rescaled value). Rows with `tuning` = "matched parameters" in `clock_comparison.csv`:
+
+| Model    | Scope  | Log-loss, checkpoint clock | Log-loss, tokens clock | Log-loss difference           | AUC difference                | Tokens clock minus the bar, log-loss |
+| -------- | ------ | -------------------------- | ---------------------- | ----------------------------- | ----------------------------- | ------------------------------------ |
+| T-SKIRT  | test   | 0.3745                     | 0.3745                 | +0.00003 [−0.00005, +0.00015] | −0.00002 [−0.00005, +0.00000] | +0.0580 [+0.0440, +0.0728]           |
+| T-SKIRT  | pooled | 0.4460                     | 0.4460                 | −0.00001 [−0.00005, +0.00004] | +0.00000 [−0.00002, +0.00004] | +0.0435 [+0.0359, +0.0501]           |
+| DriftIRT | test   | 0.3053                     | 0.3053                 | −0.00002 [−0.00003, −0.00000] | +0.00001 [−0.00000, +0.00002] | −0.0112 [−0.0140, −0.0077]           |
+| DriftIRT | pooled | 0.3846                     | 0.3845                 | −0.00006 [−0.00007, −0.00005] | +0.00001 [+0.00001, +0.00002] | −0.0180 [−0.0226, −0.0126]           |
+
+With matched parameters the clock changes DriftIRT by less than 0.0001 log-loss on the test block and pooled; the pooled +0.002 of the re-tuned comparison at h = 1 does not appear, which suggests the re-tuning rather than the clock produced it. The matched comparison exists only at h = 1; it was not run at h = 5 or 20. The stored parameters (0.000238095, 0.154303) are six-significant-figure approximations of the exact rescaling (relative error below 1e-6), so no rerun is warranted. Neither model's verdict against the bar changes under either comparison.
+
+The clock should matter only when checkpoint spacing is uneven within a model or differs between models that are pooled. That is the case for Pythia, Amber and K2, whose tokens-seen values are now derived or estimated (`src/llm_kt/time_metadata.py`), so the tokens clock is the right default once learner models are fitted across models. For single-model OLMo-2 results at h = 1 with matched parameters, either clock gives the same numbers to within 0.0001 log-loss.
+
+### Limitations
+
+- **Look-ahead at h = 5 and 20.** Hyperparameters were chosen on validation targets 56 to 74, while the test forecasts at h = 20 originate at 55 to 73 and the first four at h = 5 originate at 70 to 73. Tuning saw observations later than those origins, so the h = 5 and h = 20 tables, including the paired comparisons against the bar, are retrospective, not clean forecasts. h = 1 is unaffected.
+- **Mechanism.** The comparisons measure whether a model beats the bar, not why. DriftIRT's gain is reproducible, but DriftIRT and the bar differ in link, prior, residual update and the shared skill state at once.
+- **Workbook 1 criterion.** No learner model beats the bar on both log-loss and within-skill AUC on the test block at any horizon.
+- Only one model and one benchmark, as in §9.
+- The learner models were not re-tuned against the new bar. For T-SKIRT and DriftIRT this cannot change the selected setting (each was chosen by its own validation log-loss), but it means no setting was searched specifically to beat recency weighting.
+- The `rho` grid is coarse between 0.9 and 0.95; the two differ by 0.003 validation log-loss, smaller than either's standard error. The half-life-8 value (0.917) in that gap has 0.0013 lower validation log-loss than 0.9; it is kept as a sensitivity control, not the bar.
+- The temperature-calibrated T-SKIRT variant was not rescored (verdict unaffected, see above).
+- The DriftIRT tokens-clock optimum is at the lower edge of `q_theta` twice in a row; the curve is flat there (0.3206, 0.3207, 0.3210), so it was not extended further.
+
+### Follow-ups
+
+1. **Fix the look-ahead.** Re-select every hyperparameter (`rho`, `q`, `nu`, BKT `kappa`/`rho`) on targets up to 54 and report test from target 75, so that at h = 20 no test forecast originates inside the selection window. Until then the h = 5 and h = 20 results stay labelled retrospective.
+2. **DriftIRT ablation.** Rerun DriftIRT with the skill state frozen (`q_theta` 0) and with it removed (item residuals only), each against the bar at h = 1, to test whether the per-skill state contributes to the 0.011 log-loss gain. The Workbook 2 attribution stays withdrawn until this is done.
+3. **Matched clock at h = 5 and 20.** Only if the clock question comes back for OLMo-2; the h = 1 matched comparison shows no clock effect.

@@ -81,6 +81,9 @@ def assign_blocks(
     checkpoints, val the `val_frac` share immediately before it, train everything
     earlier. Block sizes are rounded up, so val and test are never empty; train must
     keep at least one checkpoint.
+
+    Blocks are by target index, so at horizon h > 1 a test forecast can originate inside
+    the val block: settings chosen on val have then seen data later than its origin.
     """
     if not (0 < test_frac < 1 and 0 < val_frac < 1 and test_frac + val_frac < 1):
         raise ValueError(
@@ -379,3 +382,48 @@ def paired_difference(
             }
         )
     return pd.DataFrame(rows)
+
+
+SLICE_KEYS = ["model", "origin_idx", "target_idx", "skill"]
+
+
+def align_slices(
+    results: pd.DataFrame, keys: list[str] | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Keep only the slices every predictor in `results` was scored on.
+
+    Result files written by different runs can cover different origins (for example a
+    longer horizon run started later). Pairing or ranking predictors on unequal row sets
+    would compare different targets, so this intersects the slice keys (default:
+    model, origin_idx, target_idx, skill) across predictors. Returns (aligned, dropped):
+    `dropped` has one row per predictor with n_rows, n_kept and n_dropped and the
+    origin_idx range of the dropped rows (NaN when nothing was dropped). Raises if a
+    predictor has duplicate slices or the intersection is empty.
+    """
+    keys = SLICE_KEYS if keys is None else list(keys)
+    if results.empty:
+        raise ValueError("no results to align")
+    sets = {}
+    for name, g in results.groupby("predictor", sort=True):
+        if g.duplicated(keys).any():
+            raise ValueError(f"predictor {name!r} has duplicate slices on {keys}")
+        sets[name] = pd.MultiIndex.from_frame(g[keys])
+    common = None
+    for idx in sets.values():
+        common = idx if common is None else common.intersection(idx)
+    if common is None or len(common) == 0:
+        raise ValueError("predictors share no slices")
+    keep = pd.MultiIndex.from_frame(results[keys]).isin(common)
+    rows = []
+    for name, idx in sets.items():
+        mask = (results["predictor"] == name).to_numpy()
+        dropped = results[mask & ~keep]
+        rows.append({
+            "predictor": name,
+            "n_rows": int(mask.sum()),
+            "n_kept": int((mask & keep).sum()),
+            "n_dropped": len(dropped),
+            "dropped_origin_min": dropped["origin_idx"].min() if len(dropped) else np.nan,
+            "dropped_origin_max": dropped["origin_idx"].max() if len(dropped) else np.nan,
+        })
+    return results[keep].reset_index(drop=True), pd.DataFrame(rows)
