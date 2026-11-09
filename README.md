@@ -124,6 +124,27 @@ python scripts/analyze_bar.py   # chooses rho and the clock settings on validati
                                 # clock rows; writes docs/results/bar/ and docs/figures/bar_rescoring.png
 ```
 
+DriftIRT ablation (`docs/superpowers/specs/2026-11-03-driftirt-ablation.md`): which ingredient carries DriftIRT's lead over the bar. OLMo-2 MMLU, h = 1; each arm is one `run_models.py` call with a DriftIRT ablation switch, writing `models_abl_<arm>_h1.parquet` (logs in `data/processed/logs/abl_<arm>_h1.log`). Each grid covers both analyses: the matched setting (`q_delta` 0.01, `q_theta` 0.01 or 0) is in every grid. Run as five parallel processes, about 1.5 min per arm without a state and 5 to 6 min for the nine-setting grids; one process needs about 1.6 GB.
+
+```bash
+D="python scripts/run_models.py --models olmo2-7b --benchmarks mmlu --predictors drift_irt \
+   --delta-prior-var 1 --forecast-var-scale 0 --residual-scale probit --horizon 1"
+$D --q-theta 0 --q-delta 0.003 0.01 0.03 --no-skill-state --flat-items --tag abl_L1   # L1, names end _noskill_flat
+$D --q-theta 0 --q-delta 0.003 0.01 0.03 --no-skill-state --tag abl_L2                # L2, _noskill
+$D --q-theta 0 --q-delta 0.003 0.01 0.03 --tag abl_L3                                 # L3, static subject ability
+$D --q-theta 0 --q-delta 0.003 0.01 0.03 --global-skill --tag abl_L3g                 # L3g, _gskill
+$D --q-theta 0.003 0.01 0.03 --q-delta 0.003 0.01 0.03 --tag abl_L4                   # L4 re-tuning grid
+$D --q-theta 0.003 0.01 0.03 --q-delta 0.003 0.01 0.03 --global-skill --tag abl_L4g   # L4g
+$D --q-theta 0.003 0.01 0.03 --q-delta 0.003 0.01 0.03 --shuffle-skills 0 --tag abl_L4s   # L4s, _shuf0
+$D --q-theta 0.01 --q-delta 0.01 --shuffle-skills 1 2 3 --tag abl_L4s123              # shuffle seeds 1-3, matched
+$D --q-theta 0.003 --q-delta 0.01 --shuffle-skills 1 2 3 --tag abl_L4s123_retuned     # seeds 1-3 at seed 0's
+                                                                                       # validation winner
+python scripts/analyze_ablation.py   # matched (primary) and re-tuned analyses, writes docs/results/ablation/
+                                     # and docs/figures/driftirt_ablation.png
+```
+
+The archived L4 (`drift_irt_qt0.01_qd0.01_pv1_fv0_zres` in `models_drift_grid_h1.parquet`) and the bar (`item_mean_ewma_r0.9` in `models_ewma_grid_h1.parquet`) are read from the earlier runs. Seed 0's validation winner for L4s was `q_theta` 0.003, `q_delta` 0.01, so seeds 1 to 3 needed the second shuffle run above (45 configurations in all, 1.5 min for that run). Logs: `data/processed/logs/abl_*_h1.log`.
+
 ## Tests
 
 ```bash

@@ -529,7 +529,34 @@ Two questions left open by §9. First, Workbook 2 set the bar from Sprint 5 to t
 
 **Headline.** On OLMo-2 MMLU at h=1, recency captures most of the improvement over the plain item mean; DriftIRT adds a reproducible 0.011 log-loss improvement with no demonstrated AUC difference, and its mechanism is unproven. ("Most": the `rho` 0.9 bar recovers 0.0582 of DriftIRT's 0.0694 test log-loss gain over the item mean, 84%; the half-life-8 control recovers 87%; `sensitivity_halflife8.csv`.)
 
-**Correction to Workbook 2.** Workbook 2 (submitted Oct 29) attributed DriftIRT's gain over the recency-weighted item mean to the per-skill state. That attribution is withdrawn pending an ablation (Follow-ups below). It also quoted DriftIRT's lead as −0.009 [−0.012, −0.006]. That figure came from the Oct 27 DriftIRT analysis against an exponentially weighted item mean with half-life 8 checkpoints (`rho` 0.917), which was never archived; it is not the comparison against `rho` 0.9 and it did not come from a repository CSV. The archived comparison against `rho` 0.9 gives −0.011 [−0.014, −0.008]; the sensitivity run below now archives the half-life-8 comparison: −0.0093 [−0.0120, −0.0058], the quoted figure at three decimals.
+**Correction to Workbook 2.** Workbook 2 (submitted Oct 29) attributed DriftIRT's gain over the recency-weighted item mean to the per-skill state. That attribution is withdrawn; the ablation result below replaces it with a measured one. It also quoted DriftIRT's lead as −0.009 [−0.012, −0.006]. That figure came from the Oct 27 DriftIRT analysis against an exponentially weighted item mean with half-life 8 checkpoints (`rho` 0.917), which was never archived; it is not the comparison against `rho` 0.9 and it did not come from a repository CSV. The archived comparison against `rho` 0.9 gives −0.011 [−0.014, −0.008]; the sensitivity run below now archives the half-life-8 comparison: −0.0093 [−0.0120, −0.0058], the quoted figure at three decimals.
+
+**Ablation result (2026-11-06).** Pre-specified in `docs/superpowers/specs/2026-11-03-driftirt-ablation.md` before any arm was run, but on a test block that had already been examined (this section and the October model selection both reported it), so the test block is not fresh. OLMo-2 MMLU, h = 1. Arms: L0 the bar; L1 item-only probit random walk with a flat item prior; L2 the same with Fluid's 2PL prior; L3 static per-subject ability (`q_theta` 0); L3g static global ability; L4 full DriftIRT (archived setting); L4g drifting global ability; L4s full model with subjects replaced by a random partition of equal sizes. Analysis 1 (primary) holds every arm at the archived setting wherever the ingredient exists (`q_delta` 0.01; `q_theta` 0.01 for drifting states, 0 for static ones); no selection. Intervals are 95% paired cluster-bootstrap intervals over the 57 subjects, 2,000 replicates, one set of subject draws shared by every contrast. Only L4 − L3 on test log-loss is confirmatory; every other row is exploratory. Tables: `docs/results/ablation/`; figure `docs/figures/driftirt_ablation.png`; script `scripts/analyze_ablation.py`.
+
+| Arm | Test log-loss | Test AUC |
+| --- | --- | --- |
+| L0, the bar | 0.3165 ± 0.0186 | 0.9334 ± 0.0056 |
+| L1, no skill state, flat prior | 0.3075 ± 0.0199 | 0.9335 ± 0.0054 |
+| L2, no skill state, Fluid prior | 0.3076 ± 0.0200 | 0.9335 ± 0.0056 |
+| L3, static subject ability | 0.3064 ± 0.0196 | 0.9335 ± 0.0055 |
+| L3g, static global ability | 0.3063 ± 0.0197 | 0.9335 ± 0.0055 |
+| L4, full DriftIRT | 0.3053 ± 0.0202 | 0.9334 ± 0.0055 |
+| L4g, drifting global ability | 0.3044 ± 0.0196 | 0.9335 ± 0.0055 |
+| L4s, subjects shuffled (seed 0) | 0.3044 ± 0.0192 | 0.9334 ± 0.0053 |
+
+(`matched_ladder.csv`; SEs per arm, so they say nothing about paired differences.) Contrasts, test log-loss, first arm minus second (`matched_contrasts.csv`):
+
+| Contrast | Label | Test log-loss | Reading |
+| --- | --- | --- | --- |
+| L1 − L0, link and filter plus prior treatment (two changes) | exploratory | −0.0090 [−0.0108, −0.0068] | L1 beats the bar |
+| L2 − L1, Fluid prior centre | exploratory | +0.0001 [−0.0001, +0.0004] | no demonstrated difference |
+| L3 − L2, static subject level | exploratory | −0.0012 [−0.0016, −0.0007] | L3 beats L2 |
+| **L4 − L3, drift in the per-skill ability** | **confirmatory** | **−0.0011 [−0.0021, −0.00002]** | **L4 beats L3** |
+| L3 − L3g, subject versus global static level | exploratory | +0.0001 [−0.0001, +0.0005] | no demonstrated difference |
+| (L4 − L3) − (L4g − L3g) | exploratory | +0.0008 [+0.000001, +0.0021] | see below |
+| L4 − L4s, real subjects versus a random partition (seed 0) | exploratory | +0.0009 [−0.0001, +0.0025] | no demonstrated difference |
+
+On AUC no contrast in this table has an interval that excludes zero on the test block (exploratory). The confirmatory result: allowing the per-skill ability to drift beats holding it static by 0.0011 test log-loss, an interval whose upper end lies just below zero, with no demonstrated AUC difference. The difference-in-differences row (exploratory) reads: allowing drift provides a smaller predictive benefit in the subject model than in the global model at these matched settings; its lower end is 0.000001, at the margin. Shuffle sensitivity (exploratory, `shuffle_seeds.csv`): L4 − L4s is +0.00088, +0.00092, +0.00094 and +0.00091 for seeds 0 to 3 (mean +0.00091, range +0.00088 to +0.00094), no interval excludes zero; that is no demonstrated advantage of the MMLU subject labels over these tested partitions, not evidence that groupings are interchangeable. Analysis 2 (exploratory, `retuned_validation.csv`, `retuned_contrasts.csv`): re-tuned on validation, L1, L2, L3 and L3g choose `q_delta` 0.03, and L4, L4g and L4s choose `q_theta` 0.003, `q_delta` 0.01; L4's winner therefore differs from the archived pair (validation log-loss 0.3207 against 0.3210). At those settings L4 − L3 is −0.0018 [−0.0041, −0.0002] on test log-loss, a comparison that also changes `q_delta`. A positive drift result shows that the ability drift predicts, not that the fitted ability curves are interpretable. The Workbook 2 attribution of the gain to the per-skill state stays withdrawn: the confirmatory test supports a drifting ability over a static one, but the exploratory rows show no demonstrated advantage of the subject grouping over a single global ability or a random partition.
 
 ### Method
 
@@ -677,5 +704,5 @@ The clock should matter only when checkpoint spacing is uneven within a model or
 ### Follow-ups
 
 1. **Fix the look-ahead.** Re-select every hyperparameter (`rho`, `q`, `nu`, BKT `kappa`/`rho`) on targets up to 54 and report test from target 75, so that at h = 20 no test forecast originates inside the selection window. Until then the h = 5 and h = 20 results stay labelled retrospective.
-2. **DriftIRT ablation.** Rerun DriftIRT with the skill state frozen (`q_theta` 0) and with it removed (item residuals only), each against the bar at h = 1, to test whether the per-skill state contributes to the 0.011 log-loss gain. The Workbook 2 attribution stays withdrawn until this is done.
+2. **DriftIRT ablation.** Done 2026-11-06; see "Ablation result" at the top of this section.
 3. **Matched clock at h = 5 and 20.** Only if the clock question comes back for OLMo-2; the h = 1 matched comparison shows no clock effect.

@@ -11,6 +11,7 @@ from llm_kt.baselines import (
 )
 from llm_kt.evaluate import (
     align_slices,
+    contrast_bootstrap,
     evaluate,
     evaluate_model,
     paired_difference,
@@ -353,3 +354,103 @@ class TestAlignSlices:
         df = pd.concat([self._rows("a", [1]), self._rows("b", [5])])
         with pytest.raises(ValueError, match="share no slices"):
             align_slices(df)
+
+
+def regression_results() -> pd.DataFrame:
+    """Two predictors, two models, five skills, six targets; one undefined AUC."""
+    rng = np.random.default_rng(7)
+    rows = []
+    for pred in ["a", "b"]:
+        for model in ["m1", "m2"]:
+            for t in range(6):
+                for s in range(5):
+                    rows.append({
+                        "predictor": pred, "model": model, "origin_idx": t, "target_idx": t + 1, "block": "test",
+                        "skill": f"s{s}", "n": 10 + s + t, "log_loss": float(np.round(rng.uniform(0.2, 0.6), 4)),
+                        "auc": (np.nan if (t == 0 and s == 1) else float(np.round(rng.uniform(0.6, 0.9), 4)))})
+    return pd.DataFrame(rows)
+
+
+class TestPairedDifferenceRegression:
+    """Values recorded from paired_difference before it was routed through contrast_bootstrap."""
+
+    @pytest.mark.parametrize("metric,by,expected", [
+        ("log_loss", None, [[-0.019618390804597704, 0.028666840784036512, -0.0780037407720882, 0.024872643678160906],
+                            [-0.014096781609195414, 0.00880781709655493, -0.03033661435523116, 0.0039631346578366256]]),
+        ("log_loss", [], [[-0.016857586206896563, 0.014963316218533041, -0.04971426858513189, 0.003026296296296286]]),
+        ("auc", None, [[-0.016620689655172424, 0.02402375439259382, -0.05892377976190475, 0.0363433333333333],
+                       [0.009044827586206904, 0.02432556406772662, -0.036270000000000004, 0.056700000000000014]]),
+        ("auc", [], [[-0.003787931034482761, 0.01811311177266346, -0.03291666666666667, 0.031243333333333314]]),
+    ])
+    def test_unchanged(self, metric, by, expected):
+        out = paired_difference(regression_results(), "a", "b", by=by, metric=metric, n_boot=300, seed=3)
+        assert out[["diff", "se", "ci_low", "ci_high"]].to_numpy().tolist() == expected
+
+
+def four_arms(seed: int = 0, n_skills: int = 8) -> pd.DataFrame:
+    """Arms a, b, c, d on identical slices; scores m = u_slice + v_arm in multiples of 1/64, so
+    a - b - c + d cancels exactly within every slice while a - b does not."""
+    rng = np.random.default_rng(seed)
+    effect = {"a": 0.5, "b": 0.25, "c": 0.375, "d": 0.125}
+    rows = []
+    for s in range(n_skills):
+        for t in range(4):
+            u = int(rng.integers(0, 32)) / 64
+            ua = int(rng.integers(0, 16)) / 64
+            for arm, v in effect.items():
+                rows.append({"predictor": arm, "model": "m", "origin_idx": t, "target_idx": t + 1,
+                             "skill": f"s{s}", "n": int(5 + s + t), "log_loss": u + v * (1 + s % 3),
+                             "auc": ua + v / 4 * (1 + s % 2), "brier": 0.0, "accuracy": 0.0})
+    return pd.DataFrame(rows)
+
+
+class TestContrastBootstrap:
+    @pytest.mark.parametrize("metric", ["log_loss", "auc"])
+    @pytest.mark.parametrize("by", [None, []])
+    def test_two_arm_reproduces_paired_difference(self, metric, by):
+        res = regression_results()
+        pd_out = paired_difference(res, "a", "b", by=by, metric=metric, n_boot=500, seed=11)
+        cb = contrast_bootstrap(res, {"a": 1.0, "b": -1.0}, metric=metric,
+                                by=["model"] if by is None else by, n_boot=500, seed=11)
+        pd.testing.assert_frame_equal(cb, pd_out, check_exact=True)
+
+    def test_two_arm_on_skill_heterogeneous_data(self):
+        a = synthetic_results(12, predictor="a")
+        b = synthetic_results(12, seed=1, predictor="b").assign(n=a["n"])
+        res = pd.concat([a, b], ignore_index=True)
+        pd_out = paired_difference(res, "a", "b", by=[], n_boot=2000, seed=0)
+        cb = contrast_bootstrap(res, {"a": 1, "b": -1}, n_boot=2000, seed=0)
+        pd.testing.assert_frame_equal(cb, pd_out, check_exact=True)
+
+    def test_four_arm_point_estimate_is_difference_in_differences(self):
+        rng = np.random.default_rng(5)
+        res = four_arms()
+        res["log_loss"] = res["log_loss"] + rng.normal(0, 0.05, len(res))
+        out = contrast_bootstrap(res, {"a": 1, "b": -1, "c": -1, "d": 1}, n_boot=50)
+        mean = summarize(res, by=["predictor"]).set_index("predictor")["log_loss"]
+        assert out.loc[0, "diff"] == pytest.approx((mean["a"] - mean["b"]) - (mean["c"] - mean["d"]), abs=1e-12)
+        assert out.loc[0, "n_clusters"] == 8 and out.loc[0, "n_slices"] == 32
+
+    @pytest.mark.parametrize("metric", ["log_loss", "auc"])
+    def test_cancellation_within_slices_gives_exact_zero(self, metric):
+        res = four_arms()
+        out, boot = contrast_bootstrap(res, {"a": 1, "b": -1, "c": -1, "d": 1}, metric=metric,
+                                       n_boot=2000, seed=0, return_boot=True)
+        assert len(boot) == 1 and len(boot[0]) == 2000
+        assert np.all(boot[0] == 0.0)
+        row = out.iloc[0]
+        assert (row["diff"], row["se"], row["ci_low"], row["ci_high"]) == (0.0, 0.0, 0.0, 0.0)
+        # the same data give a nonzero spread for a contrast that does not cancel within slices
+        two = contrast_bootstrap(res, {"a": 1, "b": -1}, metric=metric, n_boot=2000, seed=0)
+        assert two.loc[0, "se"] > 0
+
+    def test_validation(self):
+        res = four_arms()
+        with pytest.raises(ValueError, match="no results"):
+            contrast_bootstrap(res, {"a": 1, "zz": -1})
+        with pytest.raises(ValueError, match="metric"):
+            contrast_bootstrap(res, {"a": 1, "b": -1}, metric="nope")
+        bad = res.copy()
+        bad.loc[(bad["predictor"] == "b") & (bad["skill"] == "s0"), "n"] += 1
+        with pytest.raises(ValueError, match="item counts"):
+            contrast_bootstrap(bad, {"a": 1, "b": -1})

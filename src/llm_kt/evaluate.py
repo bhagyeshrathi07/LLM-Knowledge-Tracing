@@ -23,7 +23,7 @@ split: at deployment time a learner model would have seen everything before the
 checkpoint it is asked about.
 
 Uncertainty. Slices within one skill are strongly correlated across checkpoints, so
-`summarize(..., n_boot=...)` and `paired_difference` use a cluster bootstrap that
+`summarize(..., n_boot=...)`, `paired_difference` and `contrast_bootstrap` use a cluster bootstrap that
 resamples whole skills (by default) rather than individual rows.
 """
 
@@ -323,44 +323,82 @@ def paired_difference(
     within each group, and the same draw is applied to both predictors because each
     resampled unit is a paired slice difference. Returns columns: by..., n, n_slices,
     n_clusters, diff, se (bootstrap SD), ci_low, ci_high (95% percentile interval).
+    This is `contrast_bootstrap` with weights {a: 1, b: -1}.
+    """
+    by = ["model"] if by is None else list(by)
+    return contrast_bootstrap(
+        results, {predictor_a: 1.0, predictor_b: -1.0}, metric=metric, by=by, cluster=cluster,
+        n_boot=n_boot, seed=seed,
+    )
+
+
+def contrast_bootstrap(
+    results: pd.DataFrame,
+    weights: dict[str, float],
+    metric: str = "log_loss",
+    by: list[str] | None = None,
+    cluster: str | None = "skill",
+    n_boot: int = 2000,
+    seed: int = 0,
+    return_boot: bool = False,
+) -> pd.DataFrame | tuple[pd.DataFrame, list[np.ndarray]]:
+    """A linear contrast sum_k weights[k] * metric_k across predictors, with one shared bootstrap.
+
+    Every predictor in `weights` is matched on the same slices (model, origin_idx, target_idx,
+    skill, block, whichever exist, plus `by`); slices missing for any of them are dropped and
+    their item counts must agree. The per-slice contrast is sum_k w_k * metric_k, and the
+    estimate is its item-count-weighted mean (for auc: the unweighted mean over slices where
+    every predictor's AUC is defined). Because the contrast is formed within each slice before
+    resampling, one set of cluster draws applies to every predictor at once: with weights
+    {a: 1, b: -1, c: -1, d: 1} this is a difference-in-differences bootstrapped jointly.
+
+    `by` defaults to [] (pooled). Clusters (default: skills) are resampled within each group;
+    the draws come from one generator seeded with `seed`, so calls with the same seed, the same
+    groups and the same number of clusters share their draws. Returns by..., n, n_slices,
+    n_clusters, diff, se (bootstrap SD), ci_low, ci_high (95% percentile interval), plus the
+    list of bootstrap replicate arrays (one per group) when return_boot is True.
     """
     if metric not in METRICS:
         raise ValueError(f"metric must be one of {METRICS}, got {metric!r}")
-    by = ["model"] if by is None else list(by)
+    if not weights:
+        raise ValueError("weights must name at least one predictor")
+    if n_boot < 2:
+        raise ValueError(f"n_boot must be >= 2, got {n_boot}")
+    by = [] if by is None else list(by)
     _check_cluster(results, cluster)
     keys = [c for c in ("model", "origin_idx", "target_idx", "skill", "block") if c in results]
     keys += [c for c in by if c not in keys]
     if cluster is not None and cluster not in keys:
         keys.append(cluster)
 
-    a = results[results["predictor"] == predictor_a]
-    b = results[results["predictor"] == predictor_b]
-    if a.empty or b.empty:
-        missing = predictor_a if a.empty else predictor_b
-        raise ValueError(f"no results for predictor {missing!r}")
-    for name, frame in (("a", a), ("b", b)):
+    names = list(weights)
+    merged = None
+    for i, name in enumerate(names):
+        frame = results[results["predictor"] == name]
+        if frame.empty:
+            raise ValueError(f"no results for predictor {name!r}")
         if frame.duplicated(keys).any():
-            raise ValueError(f"predictor_{name} has duplicate slices on {keys}")
-    paired = a[keys + ["n", metric]].merge(
-        b[keys + ["n", metric]], on=keys, suffixes=("_a", "_b"), validate="one_to_one"
-    )
-    if not (paired["n_a"] == paired["n_b"]).all():
-        raise ValueError("paired slices have different item counts; were they scored on the same data?")
-    paired["d"] = paired[f"{metric}_a"] - paired[f"{metric}_b"]
+            raise ValueError(f"predictor {name!r} has duplicate slices on {keys}")
+        frame = frame[keys + ["n", metric]].rename(columns={"n": f"n_{i}", metric: f"m_{i}"})
+        merged = frame if merged is None else merged.merge(frame, on=keys, validate="one_to_one")
+    for i in range(1, len(names)):
+        if not (merged[f"n_{i}"] == merged["n_0"]).all():
+            raise ValueError("matched slices have different item counts; were they scored on the same data?")
+    d = weights[names[0]] * merged["m_0"]
+    for i in range(1, len(names)):
+        d = d + weights[names[i]] * merged[f"m_{i}"]
+    merged["d"] = d
     if metric == "auc":
-        paired = paired[paired["d"].notna()].copy()
-        paired["w"] = 1.0
+        merged = merged[merged["d"].notna()].copy()
+        merged["w"] = 1.0
     else:
-        paired["w"] = paired["n_a"].astype(float)
-
-    if paired.empty:
-        raise ValueError(f"no slices shared by {predictor_a!r} and {predictor_b!r}")
-    if n_boot < 2:
-        raise ValueError(f"n_boot must be >= 2, got {n_boot}")
+        merged["w"] = merged["n_0"].astype(float)
+    if merged.empty:
+        raise ValueError(f"no slices shared by {names}")
 
     rng = np.random.default_rng(seed)
-    groups = paired.groupby(by, sort=True) if by else [((), paired)]
-    rows = []
+    groups = merged.groupby(by, sort=True) if by else [((), merged)]
+    rows, boots = [], []
     for key, g in groups:
         key = key if isinstance(key, tuple) else (key,)
         ids = _cluster_ids(g, cluster)
@@ -369,10 +407,11 @@ def paired_difference(
         s_c = np.bincount(ids, weights=(g["w"] * g["d"]).to_numpy(), minlength=k)
         counts = _boot_counts(rng, k, n_boot)
         boot = (counts @ s_c) / (counts @ w_c)
+        boots.append(boot)
         rows.append(
             {
                 **dict(zip(by, key)),
-                "n": int(g["n_a"].sum()),
+                "n": int(g["n_0"].sum()),
                 "n_slices": len(g),
                 "n_clusters": k,
                 "diff": float(s_c.sum() / w_c.sum()),
@@ -381,7 +420,8 @@ def paired_difference(
                 "ci_high": float(np.percentile(boot, 97.5)),
             }
         )
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    return (out, boots) if return_boot else out
 
 
 SLICE_KEYS = ["model", "origin_idx", "target_idx", "skill"]
