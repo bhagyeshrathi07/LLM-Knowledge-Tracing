@@ -4,7 +4,7 @@ import pytest
 from scipy.stats import norm, spearmanr
 
 from llm_kt.baselines import ItemMean
-from llm_kt.drift_irt import DriftIRT, filter_update, probit_score_and_curvature
+from llm_kt.drift_irt import DriftIRT, filter_update, flat_item_params, probit_score_and_curvature
 from llm_kt.evaluate import TARGET_COLUMNS, evaluate
 from llm_kt.tskirt import TSKIRT, to_probit
 
@@ -226,3 +226,127 @@ class TestPredictor:
             DriftIRT(params, residual_scale="logit")
         with pytest.raises(ValueError):
             DriftIRT(params, delta_prior_var=0.0)
+
+
+# -- skill_state=False and the flat item table (DriftIRT ablation) ------------------------------
+
+TOY_IDS = [f"mmlu_{i}" for i in range(12)]
+TOY_SKILLS = ["s0"] * 4 + ["s1"] * 4 + ["s2"] * 4
+TOY_PARAMS = pd.DataFrame({
+    "item_id": TOY_IDS,
+    "a": [2.048, 1.378, 2.217, 1.895, 0.688, 2.451, 2.022, 2.072, 0.756, 1.401, 1.242, 2.354],
+    "b": [0.066, 1.127, 0.468, -0.859, 0.369, -0.959, 0.878, -0.05, -0.185, -0.681, 1.223, -0.155],
+})
+TOY_Y = np.array([
+    [0, 1, 1, 1, 1, 0, 0, 0, 1, 1], [1, 1, 1, 1, 1, 0, 1, 0, 0, 1], [0, 0, 1, 1, 0, 1, 1, 1, 0, 0],
+    [0, 0, 1, 1, 1, 1, 0, 1, 1, 0], [0, 1, 1, 1, 1, 1, 1, 1, 0, 1], [1, 1, 1, 0, 1, 0, 0, 1, 0, 1],
+    [1, 1, 0, 1, 1, 1, 1, 0, 1, 1], [1, 0, 1, 1, 1, 0, 0, 0, 1, 0], [0, 0, 1, 1, 1, 0, 1, 1, 1, 1],
+    [1, 0, 0, 0, 1, 0, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 1, 0, 1, 1], [1, 1, 0, 1, 0, 1, 1, 1, 0, 1],
+], dtype=float)
+
+
+def item_only_reference(y: np.ndarray, a: float, b: float, q_delta: float, prior_var: float,
+                        forecast_var_scale: float, d_f: float = 1.0) -> float:
+    """One item, no ability: z = -a b - delta, delta a Gaussian random walk, Laplace update per
+    checkpoint (Newton to convergence), forecast Phi(mean / sqrt(1 + scale * (v + d_f q)))."""
+    a_p, b_p = a / 1.7, b
+    m, v = 0.0, prior_var
+    for t, yt in enumerate(y):
+        if t > 0:
+            v += q_delta
+        s = 2.0 * yt - 1.0
+        x = m
+        for _ in range(100):
+            u = s * (-a_p * b_p - x)
+            lam = np.exp(norm.logpdf(u) - norm.logcdf(u))
+            grad = -s * lam - (x - m) / v
+            curv = lam * (lam + u) + 1.0 / v
+            x += grad / curv
+        u = s * (-a_p * b_p - x)
+        lam = np.exp(norm.logpdf(u) - norm.logcdf(u))
+        m, v = x, 1.0 / (lam * (lam + u) + 1.0 / v)
+    mean_z = -a_p * b_p - m
+    return float(norm.cdf(mean_z / np.sqrt(1.0 + forecast_var_scale * (v + d_f * q_delta))))
+
+
+class TestNoSkillState:
+    @pytest.fixture
+    def toy(self):
+        return rows_from_matrix(TOY_Y, TOY_IDS, TOY_SKILLS)
+
+    def _model(self, **kw):
+        kw = {"q_theta": 0.0, "q_delta": 0.01, "delta_prior_var": 1.0, "forecast_var_scale": 0.0,
+              "residual_scale": "probit", "skill_state": False, **kw}
+        return DriftIRT(TOY_PARAMS, **kw)
+
+    def test_theta_is_exactly_zero(self, toy):
+        m = self._model()
+        m.predict(toy, target_at(toy, 10))
+        assert len(m._theta_m) == 3          # skills are still recorded
+        assert np.all(m._theta_m == 0.0)
+        assert np.all(m._theta_v == m.theta_prior_var)
+
+    @pytest.mark.parametrize("fv", [0.0, 1.0])
+    def test_matches_item_only_reference(self, toy, fv):
+        p = self._model(q_delta=0.03, forecast_var_scale=fv).predict(toy, target_at(toy, 10))
+        ref = [item_only_reference(TOY_Y[i], TOY_PARAMS["a"][i], TOY_PARAMS["b"][i], 0.03, 1.0, fv)
+               for i in range(len(TOY_IDS))]
+        assert np.all(TOY_PARAMS["a"] * TOY_PARAMS["b"] != 0)  # the item offset -a b matters
+        assert p == pytest.approx(ref, abs=1e-9)
+
+    def test_invariant_to_skill_labels(self, toy):
+        target = target_at(toy, 10)
+        p = self._model().predict(toy, target)
+        one = toy.assign(skill="all")
+        p_one = self._model().predict(one, target.assign(skill="all"))
+        rng = np.random.default_rng(1)
+        labels = dict(zip(TOY_IDS, rng.choice(["x", "y", "z", "w"], len(TOY_IDS))))
+        relabelled = toy.assign(skill=toy["item_id"].map(labels))
+        p_rel = self._model().predict(relabelled, target.assign(skill=target["item_id"].map(labels)))
+        assert np.array_equal(p, p_one) and np.array_equal(p, p_rel)
+
+    def test_invariant_to_other_items_outcomes(self, toy):
+        target = target_at(toy, 10)
+        p = self._model().predict(toy, target)
+        other = toy.copy()
+        flip = other["item_id"] != TOY_IDS[5]
+        other.loc[flip, "correct"] = 1 - other.loc[flip, "correct"]
+        p_other = self._model().predict(other, target)
+        assert p_other[5] == p[5]
+        # the same flip moves item 5 when the skill state is on (sanity check of the test)
+        on = DriftIRT(TOY_PARAMS, 0.01, 0.01, 1.0, 0.0, residual_scale="probit")
+        on2 = DriftIRT(TOY_PARAMS, 0.01, 0.01, 1.0, 0.0, residual_scale="probit")
+        assert on.predict(toy, target)[5] != on2.predict(other, target)[5]
+
+    def test_q_theta_must_be_zero_and_name(self):
+        with pytest.raises(ValueError, match="q_theta"):
+            DriftIRT(TOY_PARAMS, q_theta=0.01, skill_state=False)
+        assert self._model().name == "drift_irt_qt0_qd0.01_pv1_fv0_zres_noskill"
+
+    def test_flat_item_table_is_a1_b0_on_probit_scale(self):
+        flat = flat_item_params(["x", "y", "z"])
+        assert list(flat["item_id"]) == ["x", "y", "z"]
+        m = DriftIRT(flat, q_theta=0.0, skill_state=False)
+        assert np.all(m.params["a"] == 1.0) and np.all(m.params["b"] == 0.0)
+
+
+class TestDefaultPathRegression:
+    """The default skill_state=True path reproduces predictions recorded from the code before the
+    ablation options were added (archived setting drift_irt_qt0.01_qd0.01_pv1_fv0_zres)."""
+
+    def test_archived_setting(self):
+        hist = rows_from_matrix(TOY_Y, TOY_IDS, TOY_SKILLS)
+        m = DriftIRT(TOY_PARAMS, 0.01, 0.01, 1.0, 0.0, residual_scale="probit")
+        assert m.name == "drift_irt_qt0.01_qd0.01_pv1_fv0_zres"
+        expected = [0.5688533741217846, 0.5981018940957763, 0.44732178382485954, 0.626861815709494,
+                    0.7517832169401983, 0.573746660181722, 0.6959125554313003, 0.4477130453683395,
+                    0.7337843248483624, 0.5942068355302763, 0.8333686586045127, 0.7657353919385629]
+        assert m.predict(hist, target_at(hist, 10)) == pytest.approx(expected, rel=0, abs=1e-14)
+
+    def test_difficulty_scale_with_forecast_variance(self):
+        hist = rows_from_matrix(TOY_Y, TOY_IDS, TOY_SKILLS)
+        m = DriftIRT(TOY_PARAMS, 0.01, 0.01, 1.0, 1.0, residual_scale="difficulty")
+        expected = [0.5616973905392539, 0.5732990271235537, 0.46158887967509604, 0.6049826243738433,
+                    0.6481554926894979, 0.5301846427182518, 0.708584406035187, 0.4630865295783158,
+                    0.674735729476615, 0.6027636286139273, 0.7623036168948383, 0.7246492447260762]
+        assert m.predict(hist, target_at(hist, 12), horizon=3) == pytest.approx(expected, rel=0, abs=1e-14)

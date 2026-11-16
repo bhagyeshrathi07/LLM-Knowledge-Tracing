@@ -1,0 +1,21 @@
+analysis,row,scope,metric,diff,se,ci_low,ci_high,reading,label,range_low,range_high
+matched,L4 - L4s seed 0,test,log_loss,0.0008782691443506003,0.0007352050772211543,-8.933081613677314e-05,0.002470640710519827,no demonstrated difference,exploratory,,
+matched,L4 - L4s seed 1,test,log_loss,0.00092455105216911,0.0007112348076819393,-1.2593293515462308e-05,0.0024566086827665606,no demonstrated difference,exploratory,,
+matched,L4 - L4s seed 2,test,log_loss,0.0009418753672976131,0.0007441051854699267,-5.704589218976366e-05,0.002556153410672393,no demonstrated difference,exploratory,,
+matched,L4 - L4s seed 3,test,log_loss,0.0009086695684927366,0.0007349258906677844,-3.8908744295830176e-05,0.002516039610789131,no demonstrated difference,exploratory,,
+matched,mean of the four seeds,test,log_loss,0.000913341283077515,,,,"average of the four differences; range in range_low, range_high",exploratory,0.0008782691443506003,0.0009418753672976131
+matched,L4 - L4s seed 0,test,auc,-2.5819788734907924e-06,7.922848985725253e-05,-0.00016719619472817238,0.0001354329797717099,no demonstrated difference,exploratory,,
+matched,L4 - L4s seed 1,test,auc,-3.940249190432323e-05,8.053217170395343e-05,-0.0002105758589780019,0.00010300698571115264,no demonstrated difference,exploratory,,
+matched,L4 - L4s seed 2,test,auc,-0.00010573354258778866,8.965838828422171e-05,-0.0002949238962535961,5.555446287556063e-05,no demonstrated difference,exploratory,,
+matched,L4 - L4s seed 3,test,auc,-4.405585080011053e-05,8.435863668105161e-05,-0.00022147288676601466,0.00010542617330823704,no demonstrated difference,exploratory,,
+matched,mean of the four seeds,test,auc,-4.79434660414283e-05,,,,"average of the four differences; range in range_low, range_high",exploratory,-0.00010573354258778866,-2.5819788734907924e-06
+retuned,L4 - L4s seed 0,test,log_loss,0.0006244687520094045,0.0005871323522508342,-0.00015620133367105708,0.0019109734842227334,no demonstrated difference,exploratory,,
+retuned,L4 - L4s seed 1,test,log_loss,0.0006535788657553748,0.0005723562460216546,-9.536533199249665e-05,0.0018907150216408482,no demonstrated difference,exploratory,,
+retuned,L4 - L4s seed 2,test,log_loss,0.0006521608996169999,0.0005955709306854026,-0.00014415042133548062,0.0019304121342836825,no demonstrated difference,exploratory,,
+retuned,L4 - L4s seed 3,test,log_loss,0.0006321853702038427,0.000590253908123275,-0.000121516767475582,0.00191588843279487,no demonstrated difference,exploratory,,
+retuned,mean of the four seeds,test,log_loss,0.0006405984718964055,,,,"average of the four differences; range in range_low, range_high",exploratory,0.0006244687520094045,0.0006535788657553748
+retuned,L4 - L4s seed 0,test,auc,-3.150587311315539e-05,5.669317910530274e-05,-0.00014987585628365314,7.03581841140425e-05,no demonstrated difference,exploratory,,
+retuned,L4 - L4s seed 1,test,auc,-5.2283146170704244e-05,5.9758854622496726e-05,-0.0001769833894521009,5.887126279809844e-05,no demonstrated difference,exploratory,,
+retuned,L4 - L4s seed 2,test,auc,-9.044198715709398e-05,6.657785166039421e-05,-0.00022368595867603146,3.525698521877182e-05,no demonstrated difference,exploratory,,
+retuned,L4 - L4s seed 3,test,auc,-4.800118020676568e-05,6.142055595847857e-05,-0.00017887200005051336,6.174590056124381e-05,no demonstrated difference,exploratory,,
+retuned,mean of the four seeds,test,auc,-5.5558046661929826e-05,,,,"average of the four differences; range in range_low, range_high",exploratory,-9.044198715709398e-05,-3.150587311315539e-05

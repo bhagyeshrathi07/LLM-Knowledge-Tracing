@@ -58,6 +58,14 @@ which is tskirt's include_posterior_var folding (a / sqrt(1 + a^2 var)) applied 
 latent terms. forecast_var_scale decouples the forecast spread from the filter's own
 variances; 0 gives the plug-in forecast Phi(mean_z).
 
+Ablation switch. skill_state=False removes the ability: theta is held at exactly 0 (skills
+are still recorded for bookkeeping, but their means and variances are never touched), the
+theta Newton block and the theta predict step are skipped, and the forecast variance drops
+the theta term. The model is then a set of independent per-item probit random walks around
+the item offset, z = -a_i b_i - c_i delta_i. q_theta must be 0 in that mode. The name gains
+"_noskill". `flat_item_params` builds the item table with a = PROBIT_SCALE and b = 0 for
+every item (a = 1, b = 0 after the probit conversion), which removes Fluid's prior centre.
+
 Evaluation calls predict at successive origins with a growing history. The filter state is
 cached and only checkpoints newer than the last processed one are filtered, so a full
 walk-forward run filters each checkpoint once. The cache is reset whenever the history does
@@ -71,7 +79,7 @@ import numpy as np
 import pandas as pd
 from scipy.special import log_ndtr, ndtr
 
-from llm_kt.tskirt import to_probit
+from llm_kt.tskirt import PROBIT_SCALE, to_probit
 
 RESIDUAL_SCALES = ("difficulty", "probit")
 _LOG_SQRT_2PI = 0.5 * np.log(2.0 * np.pi)
@@ -107,12 +115,14 @@ def filter_update(
     delta_v: np.ndarray,
     n_rounds: int = 3,
     newton_iters: int = 5,
+    update_theta: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """One checkpoint's Laplace update for all skills and the items observed at it.
 
     y, a, b, c, skill_idx, delta_m, delta_v are per observed item; theta_m, theta_v are
     per skill (the predicted priors). Returns posterior (theta_m, theta_v, delta_m, delta_v).
-    Skills with no observed item keep their prior.
+    Skills with no observed item keep their prior. With update_theta=False the theta Newton
+    block is skipped and theta_m, theta_v are returned unchanged (abilities held fixed).
     """
     n_skills = len(theta_m)
     prior_tm, prior_tp = theta_m, 1.0 / theta_v
@@ -121,7 +131,7 @@ def filter_update(
     de = delta_m.copy()
     for _ in range(n_rounds):
         offset = a * b + c * de  # z = a * theta - offset
-        for _ in range(newton_iters):
+        for _ in range(newton_iters if update_theta else 0):
             g, h = probit_score_and_curvature(a * th[skill_idx] - offset, y)
             grad = np.bincount(skill_idx, a * g, n_skills) - (th - prior_tm) * prior_tp
             curv = np.bincount(skill_idx, a * a * h, n_skills) + prior_tp
@@ -133,9 +143,18 @@ def filter_update(
             curv = c * c * h + prior_dp
             de = de + np.clip(grad / curv, -_MAX_STEP, _MAX_STEP)
     _, h = probit_score_and_curvature(a * (th[skill_idx] - b) - c * de, y)
+    if not update_theta:
+        return th, theta_v.copy(), de, 1.0 / (c * c * h + prior_dp)
     theta_v_post = 1.0 / (np.bincount(skill_idx, a * a * h, n_skills) + prior_tp)
     delta_v_post = 1.0 / (c * c * h + prior_dp)
     return th, theta_v_post, de, delta_v_post
+
+
+def flat_item_params(item_ids) -> pd.DataFrame:
+    """Item table with logistic a = PROBIT_SCALE and b = 0 for every item: a = 1, b = 0 on the
+    probit scale, so every item's prior is centred at z = 0 (no Fluid difficulty)."""
+    ids = list(pd.unique(np.asarray(item_ids, dtype=object)))
+    return pd.DataFrame({"item_id": ids, "a": PROBIT_SCALE, "b": 0.0})
 
 
 def _ids(col: pd.Series) -> np.ndarray:
@@ -171,6 +190,7 @@ class DriftIRT:
         newton_iters: int = 5,
         theta_prior_var: float = 1.0,
         residual_scale: str = "difficulty",
+        skill_state: bool = True,
     ):
         if residual_scale not in RESIDUAL_SCALES:
             raise ValueError(f"residual_scale must be one of {RESIDUAL_SCALES}, got {residual_scale!r}")
@@ -178,6 +198,8 @@ class DriftIRT:
             raise ValueError("q_theta, q_delta and forecast_var_scale must be >= 0")
         if delta_prior_var <= 0 or theta_prior_var <= 0:
             raise ValueError("delta_prior_var and theta_prior_var must be > 0")
+        if not skill_state and q_theta != 0:
+            raise ValueError(f"q_theta must be 0 when skill_state is False, got {q_theta}")
         logistic = item_params.set_index("item_id")[["a", "b"]]
         a_p, b_p = to_probit(logistic["a"].to_numpy(), logistic["b"].to_numpy())
         self.params = pd.DataFrame({"a": a_p, "b": b_p}, index=pd.Index(logistic.index.to_numpy(dtype=object)))
@@ -190,10 +212,12 @@ class DriftIRT:
         self.newton_iters = newton_iters
         self.theta_prior_var = theta_prior_var
         self.residual_scale = residual_scale
+        self.skill_state = skill_state
         self.name = (
             f"drift_irt_qt{q_theta:g}_qd{q_delta:g}_pv{delta_prior_var:g}_fv{forecast_var_scale:g}"
             + ("_zres" if residual_scale == "probit" else "")
             + ("" if time_col == "checkpoint_idx" else f"_{time_col}")
+            + ("" if skill_state else "_noskill")
         )
         self._reset()
 
@@ -254,7 +278,8 @@ class DriftIRT:
     def _filter_checkpoint(self, rows: pd.DataFrame, t: float) -> None:
         if self._time_last is not None:
             d = max(t - self._time_last, 0.0)
-            self._theta_v = self._theta_v + self.q_theta * d
+            if self.skill_state:
+                self._theta_v = self._theta_v + self.q_theta * d
             self._delta_v = self._delta_v + self.q_delta * d
         self._time_last = t
         rows = rows[self.params.index.get_indexer(_ids(rows["item_id"])) >= 0]
@@ -275,6 +300,7 @@ class DriftIRT:
             self._delta_v[idx],
             n_rounds=self.n_rounds,
             newton_iters=self.newton_iters,
+            update_theta=self.skill_state,
         )
         self._theta_m, self._theta_v = th_m, th_v
         self._delta_m[idx] = de_m
@@ -318,9 +344,8 @@ class DriftIRT:
         )
 
         mean_z = a * (theta_m - b) - c * delta_m
-        var_z = self.forecast_var_scale * (
-            a * a * (theta_v + d_f * self.q_theta) + c * c * (delta_v + d_f * self.q_delta)
-        )
+        theta_var = a * a * (theta_v + d_f * self.q_theta) if self.skill_state else 0.0
+        var_z = self.forecast_var_scale * (theta_var + c * c * (delta_v + d_f * self.q_delta))
         p = ndtr(mean_z / np.sqrt(1.0 + var_z))
 
         # items without parameters: last-checkpoint skill mean, as in T-SKIRT
