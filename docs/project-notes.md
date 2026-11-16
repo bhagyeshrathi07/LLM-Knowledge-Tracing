@@ -1,6 +1,6 @@
 # Knowledge Tracing for LLMs — Project Notes
 
-Working notes for the team. Covers what we are building, what prior work exists, the design problems we found, and the decisions made so far. Last updated 2026-10-27 (week 10 of semester 1): the data tables in Sections 2 and 3 were corrected against the built Parquet table and completed items in Section 7 marked done. Design and roadmap text otherwise dates from 2026-09-30.
+Working notes for the team. Covers what we are building, what prior work exists, the design problems we found, and the decisions made so far. Last updated 2026-11-16: added the held-out-item/transfer evaluation and the rerun chance-adjusted forgetting results in Section 10.
 
 **Status:** Decisions 1–5 adopted by the team on 2026-09-29 (Section 6); advisor sign-off on Decisions 1–2 still pending. Phase 1 data verified (Section 3). An independent review on 2026-09-30 corrected several empirical numbers, citations and method claims; see the dated corrections in Sections 3, 4 and 6 and `docs/workbook/Workbook1-review-2026-09-30.md`.
 
@@ -499,3 +499,41 @@ What BKT still offers the project is the forgetting machinery and the interpreta
 2. Fit the per-skill limit with a second initialisation and report its mastery curves as the forgetting story's figure; that figure, not the selected setting's, is the one to show the advisor.
 3. Pool across the six models at the skill level (shared `learn` and `forget` per subject, per-model emissions) as the one way a per-skill state could add information the item's own history does not have.
 4. Try the Fluid anchor with `kappa` below 1 and with `rho` between 0.9 and 1, since both optima were at grid edges in the directions that matter least for the verdict.
+
+## 10. Held-out items, transfer and chance-adjusted forgetting (2026-11-16)
+
+### Same-checkpoint held-out-item diagnosis
+
+`scripts/run_heldout.py` divides OLMo-2 MMLU items deterministically within each of the 57
+subjects (seed 0): 7,020 fit items and 7,022 held-out items. T-SKIRT sees only fit-item responses
+through each checkpoint and uses Fluid's externally fitted 2PL item parameters; held-out answers
+are scored at that same checkpoint. This is a within-checkpoint diagnosis, not a future-time
+forecast. The `nu` value is selected on the validation block, then reported once on the test block.
+
+At `nu=0.3`, test log-loss is 0.466 and mean within-subject AUC is 0.846 on held-out items. The
+same-checkpoint skill-mean control has log-loss 0.622 and AUC 0.500; the global-mean control has
+0.677 and 0.500. The external item parameters plus the fitted per-subject trajectories therefore
+generalize beyond the items used to fit them, conditional on those item calibrations.
+
+### Transfer to other benchmarks
+
+For ARC-Challenge, HellaSwag and WinoGrande, a linear calibration from the mean fitted MMLU
+ability trajectory to each benchmark's accuracy is fit using train-block checkpoints only; later
+checkpoints are held out for scoring. The test-block log-losses for the trajectory transfer are
+0.680, 0.497 and 0.551, respectively, versus 0.681, 0.498 and 0.551 for the train-prevalence
+control. A control mapping raw MMLU fit-item accuracy transfers better (0.674, 0.491 and 0.545).
+These weak gains do not support useful cross-benchmark transfer from the fitted ability summary.
+All three transfer predictors output one probability per benchmark/checkpoint, so their AUC is
+0.5 by construction; this test evaluates benchmark-level accuracy calibration, not item ranking.
+Full per-checkpoint scores are in `docs/results/heldout/`.
+
+### Chance-adjusted forgetting rerun
+
+Re-running `scripts/run_forgetting.py --chance-check` with the MMLU answer key finds five
+selection-adjusted peak-to-final drops, as before. The gold-letter analysis classifies the Amber
+professional-medicine drop and all three Pythia drops as position bias. OLMo-1
+`moral_scenarios` remains distinct: its 0.124 accuracy drop is reduced by only 0.022 after the
+letter adjustment, leaving a 0.102 residual; the position-bias flag is false. This is evidence of
+a subject-specific behavioral drop, not by itself proof of latent forgetting. Reproducible tables
+are written to the gitignored `data/processed/forgetting_peak_to_final.parquet` and
+`data/processed/forgetting_chance_check.parquet`.

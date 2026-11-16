@@ -55,6 +55,19 @@ python scripts/run_baselines.py --horizon 1
 
 Trivial predictors in `src/llm_kt/baselines.py`: `global_mean`, `skill_mean`, `item_mean`, `copy_last`, `copy_last_calibrated`. The strongest is `item_mean` (pooled h=1: log-loss 0.360, within-skill AUC 0.80; MMLU only: 0.483 / 0.79). A learner model must beat it on the same benchmark subset and horizon to have learned something the raw data did not already say. AUC is computed within (model, checkpoint, skill) slices, so any predictor that is constant within a skill scores 0.50 by construction. To add a model, implement the `Predictor` protocol in `src/llm_kt/evaluate.py` (it receives the forecast `horizon`) and pass it to `evaluate()`. Results are written to `data/processed/baseline_results_h{horizon}.parquet`.
 
+Same-checkpoint held-out-item diagnosis and cross-benchmark transfer (one OLMo-2 MMLU run):
+
+```bash
+python scripts/run_heldout.py
+```
+
+The script splits MMLU items within each subject, fits T-SKIRT on one split, selects its drift
+setting on the validation checkpoints, and scores the held-out items at those same checkpoints.
+It then calibrates the mean MMLU trajectory to ARC-Challenge, HellaSwag and WinoGrande scores on
+the train checkpoints and reports performance on later checkpoints. These are diagnostic and
+transfer tests, distinct from the next-checkpoint forecast. Results are saved under
+`docs/results/heldout/`.
+
 ## Learner models
 
 `scripts/run_models.py` scores the learner models with the same harness: static IRT persistence, T-SKIRT, DriftIRT, BKT (`src/llm_kt/bkt.py`, a per-skill two-state model with one transition per checkpoint, batched log-space emissions and per-item guess/slip shrunk toward an anchor). Learner models run on MMLU only; the other benchmarks stay for the ladder, transfer tests and controls.

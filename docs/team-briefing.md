@@ -79,7 +79,7 @@ Notes on the heavier modules:
 
 ### Scripts, `scripts/`
 
-`ingest_fluid.py`, `plot_skill_curves.py`, `run_baselines.py`, `run_models.py` (`--predictors item_mean static_irt tskirt drift_irt`, `--nu`, `--recalibrate`, `--tau`, `--tau-a`, `--q-theta`, `--q-delta`, `--horizon`), `run_calibrated.py`, `run_forgetting.py` (`--chance-check` adds the chance-adjusted table), `analyze_sweep.py`, `analyze_horizons.py`, `analyze_ladder.py` (ladder tables and the two ladder figures in `docs/figures/`), `analyze_drift_irt.py` (selects a DriftIRT setting on validation; paired differences vs. item mean at h = 1, 5, 20), `analyze_bkt.py` (selects the BKT settings on validation; paired differences vs. item mean and vs. the recency-weighted item mean at h = 1, 5, 20; draws the validation grid and the horizon curves; `--mastery` fits and plots per-subject mastery for the selected setting and the per-skill limit, `--replot-mastery` redraws those two figures from the stored CSVs without refitting; stores every table under `docs/results/bkt/`). `run_models.py` also takes `--predictors bkt item_mean_ewma` with `--kappa`, `--rho`, `--anchor`, `--theta-lo`, `--theta-hi`. Each writes to `data/processed/` (gitignored). The README has the setup, ingest and baseline commands; each script's docstring has its own.
+`ingest_fluid.py`, `plot_skill_curves.py`, `run_baselines.py`, `run_models.py` (`--predictors item_mean static_irt tskirt drift_irt`, `--nu`, `--recalibrate`, `--tau`, `--tau-a`, `--q-theta`, `--q-delta`, `--horizon`), `run_calibrated.py`, `run_forgetting.py` (`--chance-check` adds the chance-adjusted table), `run_heldout.py` (same-checkpoint held-out-item diagnosis and cross-benchmark transfer), `analyze_sweep.py`, `analyze_horizons.py`, `analyze_ladder.py` (ladder tables and the two ladder figures in `docs/figures/`), `analyze_drift_irt.py` (selects a DriftIRT setting on validation; paired differences vs. item mean at h = 1, 5, 20), `analyze_bkt.py` (selects the BKT settings on validation; paired differences vs. item mean and vs. the recency-weighted item mean at h = 1, 5, 20; draws the validation grid and the horizon curves; `--mastery` fits and plots per-subject mastery for the selected setting and the per-skill limit, `--replot-mastery` redraws those two figures from the stored CSVs without refitting; stores every table under `docs/results/bkt/`). `run_models.py` also takes `--predictors bkt item_mean_ewma` with `--kappa`, `--rho`, `--anchor`, `--theta-lo`, `--theta-hi`. Each writes to `data/processed/` (gitignored). The README has the setup, ingest and baseline commands; each script's docstring has its own.
 
 ### Documents
 
@@ -224,6 +224,15 @@ Owners follow the track split from Sep 29 (Ronak: data, harness, visualization; 
 | Held-out test of fitted trajectories                  | Aniket   | Nov 2          | Not started                                                                                                                                                       |
 | Phase 2 GPU pilot and cost estimate; go/no-go         | Aniket   | Nov 25; Dec 12 | On the calendar                                                                                                                                                   |
 
+**Status update (2026-11-16):** Aniket's chance-adjusted forgetting rerun and held-out evaluation
+are complete. Four of the five selection-adjusted forgetting flags show answer-position bias; the
+OLMo-1 moral-scenarios drop retains a 0.102 accuracy residual after the letter adjustment. In the
+held-out MMLU test, T-SKIRT at the validation-selected `nu=0.3` reaches test log-loss 0.466 and
+within-subject AUC 0.846 on unseen items. Cross-benchmark transfer from MMLU trajectories is only
+marginally better than a train-prevalence predictor, and raw MMLU accuracy transfers better than
+the T-SKIRT ability summary. Methods and results are in `docs/project-notes.md` §10 and
+`docs/results/heldout/`.
+
 **Everyone:** read `meetings/2026-10-19-advisor.md` and correct anything you remember differently before the next team meeting.
 
 ---
@@ -243,6 +252,7 @@ Owners follow the track split from Sep 29 (Ronak: data, harness, visualization; 
 | `docs/project-notes.md`                                                                       | Decisions 1–5 with pros/cons, data verification, lit-review consequences, roadmap, risks, future work (§8), BKT design and results (§9)                                                       |
 | `docs/superpowers/specs/2026-10-27-bkt-design.md`, `docs/superpowers/plans/2026-10-27-bkt.md` | The BKT design document (the why, the model, the grid) and the task-by-task plan it was built from                                                                                            |
 | `docs/results/bkt/`                                                                           | Every BKT table: validation ranking, scores and paired differences at h = 1, 5, 20, mastery curves and skill parameters, the per-slice result parquets, and the console report `analysis.txt` |
+| `docs/results/heldout/`                                                                       | Per-checkpoint held-out MMLU item scores and cross-benchmark transfer scores from the 2026-11-16 evaluation                                                               |
 | `docs/abstract-v2.md`                                                                         | Revised abstract with change log                                                                                                                                                              |
 | `docs/research-brief.md`                                                                      | The brief given to the research agents; also records measured findings                                                                                                                        |
 | `docs/lit-review-2026-09-30.md`                                                               | Five-priority literature review; §9b has the corrections and supersedes earlier recommendations                                                                                               |
